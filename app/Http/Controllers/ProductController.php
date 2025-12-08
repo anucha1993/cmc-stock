@@ -16,7 +16,7 @@ class ProductController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Product::with(['category', 'supplier']);
+        $query = Product::with(['category', 'supplier', 'stockItems']);
 
         // Filter by category
         if ($request->filled('category_id')) {
@@ -220,8 +220,54 @@ class ProductController extends Controller
      */
     public function destroy(Product $product)
     {
-        $product->delete();
-        return redirect()->route('admin.products.index')->with('success', 'สินค้าถูกลบเรียบร้อยแล้ว');
+        try {
+            // ตรวจสอบว่ามีสต็อกสินค้าหรือไม่
+            $totalStock = $product->warehouseProducts()->sum('quantity');
+            
+            if ($totalStock > 0) {
+                return redirect()->route('admin.products.index')->with('error', 
+                    'ไม่สามารถลบสินค้า "' . $product->name . '" ได้ เนื่องจากยังมีสต็อกสินค้าคงเหลืออยู่ ' . number_format($totalStock) . ' ' . $product->unit
+                );
+            }
+            
+            // ตรวจสอบว่ามีข้อมูลที่เกี่ยวข้องหรือไม่
+            $relatedData = [];
+            
+            if ($product->productionOrders()->exists()) {
+                $relatedData[] = 'คำสั่งผลิต (' . $product->productionOrders()->count() . ' รายการ)';
+            }
+            
+            if ($product->stockItems()->exists()) {
+                $relatedData[] = 'รายการสต็อก (' . $product->stockItems()->count() . ' รายการ)';
+            }
+            
+            if ($product->packageProducts()->exists()) {
+                $relatedData[] = 'แพสินค้า (' . $product->packageProducts()->count() . ' แพ)';
+            }
+            
+            if ($product->transfers()->exists()) {
+                $relatedData[] = 'การโยกย้าย (' . $product->transfers()->count() . ' รายการ)';
+            }
+            
+            if ($product->inventoryTransactions()->exists()) {
+                $relatedData[] = 'ประวัติการเคลื่อนไหว (' . $product->inventoryTransactions()->count() . ' รายการ)';
+            }
+            
+            // ถ้ามีข้อมูลที่เกี่ยวข้อง ให้แสดงข้อความแจ้งเตือน
+            if (!empty($relatedData)) {
+                return redirect()->route('admin.products.index')->with('error', 
+                    'ไม่สามารถลบสินค้า "' . $product->name . '" ได้ เนื่องจากมีข้อมูลที่เกี่ยวข้อง: ' . 
+                    implode(', ', $relatedData) . '<br>กรุณาลบข้อมูลที่เกี่ยวข้องก่อน หรือปิดการใช้งานสินค้าแทน'
+                );
+            }
+            
+            // ถ้าไม่มีข้อมูลที่เกี่ยวข้อง ก็ลบได้
+            $product->delete();
+            return redirect()->route('admin.products.index')->with('success', 'สินค้าถูกลบเรียบร้อยแล้ว');
+            
+        } catch (\Exception $e) {
+            return redirect()->route('admin.products.index')->with('error', 'เกิดข้อผิดพลาด: ' . $e->getMessage());
+        }
     }
 
     /**

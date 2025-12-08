@@ -10,8 +10,12 @@ class Warehouse extends Model
     protected $fillable = [
         'name',
         'code',
-        'location',
+        'address',
         'description',
+        'contact_person',
+        'phone',
+        'max_capacity',
+        'current_usage',
         'is_active',
         'is_main'
     ];
@@ -46,6 +50,34 @@ class Warehouse extends Model
     }
 
     /**
+     * คำนวณจำนวนสินค้าทั้งหมด (real-time จาก StockItems)
+     */
+    public function getTotalStockCount()
+    {
+        return $this->stockItems()
+            ->where('status', 'available')
+            ->count();
+    }
+
+    /**
+     * คำนวณจำนวนสินค้าตามประเภท (real-time จาก StockItems)
+     */
+    public function getStockByProduct()
+    {
+        return $this->stockItems()
+            ->where('status', 'available')
+            ->with('product')
+            ->get()
+            ->groupBy('product_id')
+            ->map(function($items) {
+                return [
+                    'product' => $items->first()->product,
+                    'quantity' => $items->count()
+                ];
+            });
+    }
+
+    /**
      * การโยกย้ายออกจากคลัง
      */
     public function transfersOut(): HasMany
@@ -67,6 +99,14 @@ class Warehouse extends Model
     public function productionOrders(): HasMany
     {
         return $this->hasMany(ProductionOrder::class, 'target_warehouse_id');
+    }
+
+    /**
+     * เซสชั่นตรวจนับสต็อก
+     */
+    public function stockCheckSessions(): HasMany
+    {
+        return $this->hasMany(StockCheckSession::class);
     }
 
     /**

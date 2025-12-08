@@ -153,8 +153,9 @@
                 <tbody>
                     @forelse($stocks as $warehouseProduct)
                         <tr>
-                            <td>{{ $warehouseProduct->product->code }}</td>
+                            <td>{{ $warehouseProduct->product->sku }}</td>
                             <td>{{ $warehouseProduct->product->name }}</td>
+                            
                             <td>
                                 @if($warehouseProduct->product->category)
                                     <span class="badge" style="background-color: {{ $warehouseProduct->product->category->color }}; color: {{ $warehouseProduct->product->category->getTextColor() }};">
@@ -162,6 +163,7 @@
                                     </span>
                                 @endif
                             </td>
+
                             <td>
                                 <span class="badge {{ $warehouseProduct->quantity > 0 ? 'badge-success' : 'badge-danger' }}">
                                     {{ number_format($warehouseProduct->quantity) }}

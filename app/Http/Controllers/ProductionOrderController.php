@@ -84,6 +84,7 @@ class ProductionOrderController extends Controller
         $rules = [
             'order_type' => 'required|in:single,package,multiple',
             'target_warehouse_id' => 'required|exists:warehouses,id',
+            'storage_location' => 'nullable|string|max:100',
             'due_date' => 'required|date|after_or_equal:today',
             'priority' => 'required|in:low,normal,high,urgent',
             'description' => 'nullable|string|max:500',
@@ -117,6 +118,7 @@ class ProductionOrderController extends Controller
                 'order_code' => ProductionOrder::generateOrderCode(),
                 'order_type' => $request->order_type,
                 'target_warehouse_id' => $request->target_warehouse_id,
+                'storage_location' => $request->storage_location,
                 'priority' => $request->priority,
                 'status' => ProductionOrder::STATUS_PENDING,
                 'due_date' => $request->due_date,
@@ -213,6 +215,7 @@ class ProductionOrderController extends Controller
             'quantity' => 'required|integer|min:1|min:' . $productionOrder->produced_quantity,
             'due_date' => 'required|date|after_or_equal:today',
             'priority' => 'required|in:low,normal,high,urgent',
+            'storage_location' => 'nullable|string|max:100',
             'notes' => 'nullable|string|max:500',
         ]);
 
@@ -224,6 +227,7 @@ class ProductionOrderController extends Controller
             'quantity' => $request->quantity,
             'due_date' => $request->due_date,
             'priority' => $request->priority,
+            'storage_location' => $request->storage_location,
             'notes' => $request->notes,
         ]);
 
@@ -350,8 +354,15 @@ class ProductionOrderController extends Controller
      */
     public function updateProducedQuantity(Request $request, ProductionOrder $productionOrder)
     {
-        if ($productionOrder->status !== 'completed') {
-            return redirect()->back()->with('error', 'สามารถบันทึกจำนวนที่ผลิตจริงได้เฉพาะใบสั่งที่เสร็จแล้วเท่านั้น');
+        // ถ้ามีการส่ง complete_production มา = กำลังจะเปลี่ยนสถานะจาก in_production -> completed
+        if ($request->has('complete_production')) {
+            if ($productionOrder->status !== 'in_production') {
+                return redirect()->back()->with('error', 'สามารถบันทึกการผลิตเสร็จสิ้นได้เฉพาะสถานะ "กำลังผลิต" เท่านั้น');
+            }
+        } else {
+            if ($productionOrder->status !== 'completed') {
+                return redirect()->back()->with('error', 'สามารถบันทึกจำนวนที่ผลิตจริงได้เฉพาะใบสั่งที่เสร็จแล้วเท่านั้น');
+            }
         }
 
         $validator = Validator::make($request->all(), [
@@ -366,7 +377,15 @@ class ProductionOrderController extends Controller
         try {
             DB::beginTransaction();
 
-            $updateData = ['produced_quantity' => $request->produced_quantity];
+            $updateData = [
+                'produced_quantity' => $request->produced_quantity,
+            ];
+            
+            // ถ้ากำลัง complete production ให้เปลี่ยนสถานะและบันทึกวันที่เสร็จ
+            if ($request->has('complete_production')) {
+                $updateData['status'] = 'completed';
+                $updateData['completion_date'] = now();
+            }
             
             // เพิ่มหมายเหตุถ้ามี
             if ($request->notes) {
@@ -381,11 +400,16 @@ class ProductionOrderController extends Controller
 
             DB::commit();
 
+            $message = $request->has('complete_production') 
+                ? 'บันทึกการผลิตเสร็จสิ้น: ' . number_format($request->produced_quantity) . ' รายการ'
+                : 'บันทึกจำนวนที่ผลิตจริง: ' . number_format($request->produced_quantity) . ' รายการ';
+
             return redirect()->route('admin.production-orders.show', $productionOrder)
-                           ->with('success', 'บันทึกจำนวนที่ผลิตจริง: ' . number_format($request->produced_quantity) . ' รายการ');
+                           ->with('success', $message);
 
         } catch (\Exception $e) {
             DB::rollback();
+            Log::error("UpdateProducedQuantity Error: " . $e->getMessage());
             return redirect()->back()->with('error', 'เกิดข้อผิดพลาด: ' . $e->getMessage());
         }
     }
@@ -401,8 +425,8 @@ class ProductionOrderController extends Controller
         $dateFrom = $request->date_from ?: now()->startOfMonth()->format('Y-m-d');
         $dateTo = $request->date_to ?: now()->endOfMonth()->format('Y-m-d');
         
-        $query->whereDate('order_date', '>=', $dateFrom)
-              ->whereDate('order_date', '<=', $dateTo);
+        $query->whereDate('requested_at', '>=', $dateFrom)
+              ->whereDate('requested_at', '<=', $dateTo);
 
         // Filter by status
         if ($request->filled('status')) {
@@ -421,10 +445,10 @@ class ProductionOrderController extends Controller
             'total_quantity' => $orders->where('status', 'completed')->sum('quantity'),
             'avg_completion_time' => $orders->where('status', 'completed')
                                            ->filter(function($order) {
-                                               return $order->started_at && $order->completed_at;
+                                               return $order->start_date && $order->completion_date;
                                            })
                                            ->avg(function($order) {
-                                               return $order->started_at->diffInHours($order->completed_at);
+                                               return $order->start_date->diffInHours($order->completion_date);
                                            }),
         ];
 
@@ -459,7 +483,7 @@ class ProductionOrderController extends Controller
         // สถิติสัปดาห์นี้
         $weekStats = [
             'completed_this_week' => ProductionOrder::where('status', 'completed')
-                                                   ->whereBetween('completed_at', [
+                                                   ->whereBetween('completion_date', [
                                                        $today->startOfWeek(),
                                                        $today->endOfWeek()
                                                    ])->count(),
@@ -467,7 +491,8 @@ class ProductionOrderController extends Controller
                                               ->where('priority', 'urgent')
                                               ->count(),
             'avg_progress' => ProductionOrder::where('status', 'in_production')
-                                            ->avg('progress') ?: 0,
+                                            ->selectRaw('AVG(CASE WHEN quantity > 0 THEN (produced_quantity * 100 / quantity) ELSE 0 END) as avg_progress')
+                                            ->value('avg_progress') ?: 0,
         ];
 
         return view('admin.production-orders.dashboard', compact(
@@ -563,7 +588,7 @@ class ProductionOrderController extends Controller
                 if ($itemProducedQty > 0) {
                     try {
                         Log::info("UpdateStock: Adding stock for product {$item->product_id}, warehouse {$productionOrder->target_warehouse_id}, qty {$itemProducedQty}");
-                        $this->addToStock($item->product_id, $productionOrder->target_warehouse_id, $itemProducedQty, 'production', $productionOrder->id);
+                        $this->addToStock($item->product_id, $productionOrder->target_warehouse_id, $itemProducedQty, 'production', $productionOrder->id, $productionOrder->storage_location);
                         Log::info("UpdateStock: Stock added successfully");
                     } catch (\Exception $e) {
                         Log::error("UpdateStock: Error adding stock - " . $e->getMessage());
@@ -586,7 +611,7 @@ class ProductionOrderController extends Controller
             Log::info("UpdateStock: Processing single item");
             if ($productionOrder->product_id) {
                 Log::info("UpdateStock: Adding stock for product {$productionOrder->product_id}, quantity={$producedQuantity}");
-                $this->addToStock($productionOrder->product_id, $productionOrder->target_warehouse_id, $producedQuantity, 'production', $productionOrder->id);
+                $this->addToStock($productionOrder->product_id, $productionOrder->target_warehouse_id, $producedQuantity, 'production', $productionOrder->id, $productionOrder->storage_location);
             }
         }
         
@@ -596,7 +621,7 @@ class ProductionOrderController extends Controller
     /**
      * เพิ่มสต๊อกสินค้า - สร้าง StockItem แยกแต่ละชิ้น
      */
-    private function addToStock(int $productId, int $warehouseId, int $quantity, string $type, int $referenceId)
+    private function addToStock(int $productId, int $warehouseId, int $quantity, string $type, int $referenceId, ?string $storageLocation = null)
     {
         Log::info("AddToStock: Creating {$quantity} individual StockItems for product {$productId}");
         
@@ -611,19 +636,23 @@ class ProductionOrderController extends Controller
         $createdItems = [];
         for ($i = 1; $i <= $quantity; $i++) {
             try {
-                // สร้าง Barcode เฉพาะสำหรับแต่ละชิ้น
+                // สร้าง Barcode และ Serial Number เฉพาะสำหรับแต่ละชิ้น
                 $barcode = $this->generateUniqueBarcode($product);
+                $serialNumber = $this->generateSerialNumber($product, $referenceId, $i);
+                
+                // กำหนดตำแหน่งเก็บ (ใช้จาก Production Order > Product location > สร้างอัตโนมัติ)
+                $locationCode = $storageLocation ?? $product->location ?? $this->generateLocationCode($warehouse, $product, $i);
                 
                 $stockItem = \App\Models\StockItem::create([
                     'product_id' => $productId,
                     'warehouse_id' => $warehouseId,
                     'barcode' => $barcode,
-                    'serial_number' => null, // อาจใส่ S/N ภายหลัง
+                    'serial_number' => $serialNumber,
                     'status' => 'available',
                     'cost_price' => $product->cost_price,
                     'notes' => "ผลิตจากใบสั่ง #{$referenceId}",
                     'received_date' => now(),
-                    'location_code' => null
+                    'location_code' => $locationCode
                 ]);
                 
                 $createdItems[] = $stockItem;
@@ -692,5 +721,47 @@ class ProductionOrderController extends Controller
         }
         
         return $barcode;
+    }
+
+    /**
+     * สร้าง Serial Number เฉพาะสำหรับแต่ละชิ้น
+     */
+    private function generateSerialNumber(\App\Models\Product $product, int $productionOrderId, int $sequenceNumber): string
+    {
+        // รูปแบบ: SKU-PO{OrderID}-{Sequence} (เช่น PIL4X40001-PO123-001)
+        $sku = $product->sku;
+        $serialNumber = sprintf('%s-PO%d-%03d', $sku, $productionOrderId, $sequenceNumber);
+        
+        // ตรวจสอบว่า Serial Number ซ้ำหรือไม่
+        $counter = 1;
+        $originalSerial = $serialNumber;
+        
+        while (\App\Models\StockItem::where('serial_number', $serialNumber)->exists() && $counter < 1000) {
+            $serialNumber = $originalSerial . '-' . $counter;
+            $counter++;
+        }
+        
+        if ($counter >= 1000) {
+            throw new \Exception("Cannot generate unique serial number for product {$product->id}");
+        }
+        
+        return $serialNumber;
+    }
+
+    /**
+     * สร้าง Location Code อัตโนมัติ
+     */
+    private function generateLocationCode(\App\Models\Warehouse $warehouse, \App\Models\Product $product, int $sequenceNumber): ?string
+    {
+        // ถ้า Product มี location กำหนดไว้แล้ว ใช้ตามนั้น
+        if ($product->location) {
+            return $product->location;
+        }
+        
+        // ถ้าไม่มี ให้สร้างอัตโนมัติตามรูปแบบ: {WarehouseCode}-{CategoryCode}-{Seq}
+        $warehouseCode = strtoupper(substr($warehouse->name, 0, 2)); // เอา 2 ตัวอักษรแรกของคลัง
+        $categoryCode = $product->category ? strtoupper(substr($product->category->name, 0, 2)) : 'XX';
+        
+        return sprintf('%s-%s-%03d', $warehouseCode, $categoryCode, $sequenceNumber);
     }
 }

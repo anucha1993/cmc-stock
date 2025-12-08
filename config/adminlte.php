@@ -385,6 +385,23 @@ return [
             'can' => 'manage-users',
         ],
         [
+            'text' => 'ตรวจนับสต๊อก',
+            'icon' => 'fas fa-fw fa-clipboard-check',
+            'can' => 'manage-users',
+            'submenu' => [
+                [
+                    'text' => 'ตรวจนับสต๊อก',
+                    'route' => 'admin.stock-checks.index',
+                    'icon' => 'fas fa-fw fa-mobile-alt',
+                ],
+                [
+                    'text' => 'รายการส่งตรวจสอบ',
+                    'route' => 'admin.stock-check-submissions.index',
+                    'icon' => 'fas fa-fw fa-clipboard-list',
+                ],
+            ],
+        ],
+        [
             'text' => 'สั่งผลิตสินค้า',
             'icon' => 'fas fa-fw fa-industry',
             'can' => 'manage-users',
@@ -395,14 +412,9 @@ return [
                     'icon' => 'fas fa-fw fa-list',
                 ],
                 [
-                    'text' => 'แดชบอร์ดผลิต',
+                    'text' => 'แดชบอร์ดการผลิต',
                     'route' => 'admin.production-orders.dashboard',
                     'icon' => 'fas fa-fw fa-tachometer-alt',
-                ],
-                [
-                    'text' => 'รายงานการผลิต',
-                    'route' => 'admin.production-orders.report',
-                    'icon' => 'fas fa-fw fa-chart-bar',
                 ],
             ],
         ],

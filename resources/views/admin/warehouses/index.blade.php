@@ -68,10 +68,10 @@
                                     @endif
                                 </td>
                                 <td class="text-center">
-                                    <span class="badge badge-info">{{ $warehouse->warehouse_products_count }}</span>
+                                    <span class="badge badge-info">{{ $warehouse->stock_count_items }}</span>
                                 </td>
                                 <td class="text-center">
-                                    <span class="badge badge-success">{{ number_format($warehouse->warehouse_products_sum_quantity ?: 0) }}</span>
+                                    <span class="badge badge-success">{{ number_format($warehouse->stock_count_items ?: 0) }}</span>
                                 </td>
                                 <td class="text-center">
                                     @if($warehouse->is_active)

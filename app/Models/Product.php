@@ -395,7 +395,8 @@ class Product extends Model
      */
     public function getTotalStockAttribute(): int
     {
-        return $this->warehouseProducts()->sum('quantity');
+        // นับจำนวน stock items ที่ยังไม่ถูกขาย (available)
+        return $this->stockItems()->where('status', 'available')->count();
     }
 
     /**
@@ -403,7 +404,7 @@ class Product extends Model
      */
     public function getAvailableStockAttribute(): int
     {
-        return $this->warehouseProducts()->sum('available_quantity');
+        return $this->stockItems()->where('status', 'available')->count();
     }
 
     /**

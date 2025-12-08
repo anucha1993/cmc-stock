@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\Warehouse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Pagination\LengthAwarePaginator;
 
 class WarehouseController extends Controller
 {
@@ -17,9 +19,14 @@ class WarehouseController extends Controller
      */
     public function index()
     {
-        $warehouses = Warehouse::withCount(['warehouseProducts'])
-                               ->withSum('warehouseProducts', 'quantity')
-                               ->paginate(10);
+        $warehouses = Warehouse::paginate(10);
+        
+        // Add real-time stock count to each warehouse
+        $warehouses->getCollection()->transform(function($wh) {
+            $wh->stock_count_items = $wh->getTotalStockCount();
+            return $wh;
+        });
+
         return view('admin.warehouses.index', compact('warehouses'));
     }
 
@@ -38,7 +45,7 @@ class WarehouseController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'location' => 'nullable|string',
+            'address' => 'nullable|string',
             'description' => 'nullable|string',
         ]);
 
@@ -54,7 +61,7 @@ class WarehouseController extends Controller
         $warehouse = Warehouse::create([
             'name' => $request->name,
             'code' => Warehouse::generateCode($request->name),
-            'location' => $request->location,
+            'address' => $request->address,
             'description' => $request->description,
             'is_active' => $request->has('is_active'),
             'is_main' => $request->has('is_main'),
@@ -68,9 +75,13 @@ class WarehouseController extends Controller
      */
     public function show(Warehouse $warehouse)
     {
-        $warehouse->load(['warehouseProducts.product.category']);
+        // Load stock items with product and category info
+        $stockItems = $warehouse->stockItems()
+            ->where('status', 'available')
+            ->with(['product.category'])
+            ->get();
         
-        return view('admin.warehouses.show', compact('warehouse'));
+        return view('admin.warehouses.show', compact('warehouse', 'stockItems'));
     }
 
     /**
@@ -89,7 +100,7 @@ class WarehouseController extends Controller
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
             'code' => 'required|string|max:10|unique:warehouses,code,' . $warehouse->id,
-            'location' => 'nullable|string',
+            'address' => 'nullable|string',
             'description' => 'nullable|string',
         ]);
 
@@ -105,7 +116,7 @@ class WarehouseController extends Controller
         $warehouse->update([
             'name' => $request->name,
             'code' => $request->code,
-            'location' => $request->location,
+            'address' => $request->address,
             'description' => $request->description,
             'is_active' => $request->has('is_active'),
             'is_main' => $request->has('is_main'),
@@ -119,18 +130,60 @@ class WarehouseController extends Controller
      */
     public function destroy(Warehouse $warehouse)
     {
-        // ตรวจสอบว่ามีสินค้าในคลังหรือไม่
-        if ($warehouse->warehouseProducts()->where('quantity', '>', 0)->count() > 0) {
-            return redirect()->back()->with('error', 'ไม่สามารถลบคลังที่มีสินค้าอยู่ได้');
-        }
+        try {
+            // ตรวจสอบว่าเป็นคลังหลักหรือไม่
+            if ($warehouse->is_main) {
+                return redirect()->back()->with('error', 'ไม่สามารถลบคลังหลักได้');
+            }
 
-        // ตรวจสอบว่าเป็นคลังหลักหรือไม่
-        if ($warehouse->is_main) {
-            return redirect()->back()->with('error', 'ไม่สามารถลบคลังหลักได้');
-        }
+            // ตรวจสอบว่ามีข้อมูลที่เกี่ยวข้องหรือไม่
+            $relatedData = [];
+            
+            if ($warehouse->stockItems()->exists()) {
+                $relatedData[] = 'รายการสต็อก (' . $warehouse->stockItems()->count() . ' รายการ)';
+            }
+            
+            if ($warehouse->warehouseProducts()->exists()) {
+                $totalStock = $warehouse->warehouseProducts()->sum('quantity');
+                if ($totalStock > 0) {
+                    $relatedData[] = 'สต็อกสินค้า (' . number_format($totalStock) . ' หน่วย)';
+                }
+            }
+            
+            // ตรวจสอบ stock check sessions
+            if ($warehouse->stockCheckSessions()->exists()) {
+                $relatedData[] = 'เซสชั่นตรวจนับสต็อก (' . $warehouse->stockCheckSessions()->count() . ' ครั้ง)';
+            }
+            
+            // ตรวจสอบ transfers
+            $transfersFrom = \App\Models\Transfer::where('from_warehouse_id', $warehouse->id)->exists();
+            $transfersTo = \App\Models\Transfer::where('to_warehouse_id', $warehouse->id)->exists();
+            if ($transfersFrom || $transfersTo) {
+                $count = \App\Models\Transfer::where('from_warehouse_id', $warehouse->id)
+                    ->orWhere('to_warehouse_id', $warehouse->id)->count();
+                $relatedData[] = 'การโยกย้ายสินค้า (' . $count . ' รายการ)';
+            }
+            
+            // ตรวจสอบ production orders
+            if ($warehouse->productionOrders()->exists()) {
+                $relatedData[] = 'คำสั่งผลิต (' . $warehouse->productionOrders()->count() . ' รายการ)';
+            }
+            
+            // ถ้ามีข้อมูลที่เกี่ยวข้อง ให้แสดงข้อความแจ้งเตือน
+            if (!empty($relatedData)) {
+                return redirect()->back()->with('error', 
+                    'ไม่สามารถลบคลัง "' . $warehouse->name . '" ได้ เนื่องจากมีข้อมูลที่เกี่ยวข้อง: ' . 
+                    implode(', ', $relatedData) . '<br>กรุณาลบข้อมูลที่เกี่ยวข้องก่อน หรือปิดการใช้งานคลังแทน'
+                );
+            }
 
-        $warehouse->delete();
-        return redirect()->route('admin.warehouses.index')->with('success', 'คลังสินค้าถูกลบเรียบร้อยแล้ว');
+            // ถ้าไม่มีข้อมูลที่เกี่ยวข้อง ก็ลบได้
+            $warehouse->delete();
+            return redirect()->route('admin.warehouses.index')->with('success', 'คลังสินค้าถูกลบเรียบร้อยแล้ว');
+            
+        } catch (\Exception $e) {
+            return redirect()->back()->with('error', 'เกิดข้อผิดพลาด: ' . $e->getMessage());
+        }
     }
 
     /**
@@ -138,14 +191,17 @@ class WarehouseController extends Controller
      */
     public function stock(Warehouse $warehouse, Request $request)
     {
-        $query = $warehouse->warehouseProducts()->with(['product.category']);
+        $query = $warehouse->stockItems()
+            ->where('status', 'available')
+            ->with(['product.category']);
 
         // Search
         if ($request->filled('search')) {
             $search = $request->search;
             $query->whereHas('product', function($q) use ($search) {
                 $q->where('name', 'like', "%{$search}%")
-                  ->orWhere('code', 'like', "%{$search}%");
+                  ->orWhere('code', 'like', "%{$search}%")
+                  ->orWhere('barcode', 'like', "%{$search}%");
             });
         }
 
@@ -156,33 +212,61 @@ class WarehouseController extends Controller
             });
         }
 
-        // Filter by stock status
+        $stockItems = $query->get();
+
+        // Group by product and calculate quantity
+        $stocks = $stockItems->groupBy('product_id')->map(function($items) {
+            $product = $items->first()->product;
+            $quantity = $items->count();
+            
+            return (object)[
+                'id' => $items->first()->id,
+                'product_id' => $product->id,
+                'product' => $product,
+                'quantity' => $quantity,
+                'location_code' => $items->first()->location_code,
+                'updated_at' => $items->max('updated_at'),
+                'status' => $quantity > 0 ? 'in_stock' : 'out_of_stock'
+            ];
+        })->values();
+
+        // Apply stock status filter
         if ($request->filled('stock_status')) {
-            switch ($request->stock_status) {
-                case 'in_stock':
-                    $query->where('quantity', '>', 0);
-                    break;
-                case 'low_stock':
-                    $query->where('quantity', '>', 0)
-                          ->where('quantity', '<=', 10); // สมมติว่าต่ำกว่า 10 คือ low stock
-                    break;
-                case 'out_of_stock':
-                    $query->where('quantity', '<=', 0);
-                    break;
-            }
+            $stocks = $stocks->filter(function($stock) use ($request) {
+                switch ($request->stock_status) {
+                    case 'in_stock':
+                        return $stock->quantity > 0;
+                    case 'low_stock':
+                        return $stock->quantity > 0 && $stock->quantity <= 10;
+                    case 'out_of_stock':
+                        return $stock->quantity <= 0;
+                }
+                return true;
+            });
         }
 
-        $stocks = $query->paginate(15);
+        // Paginate manually using LengthAwarePaginator so view can call ->total(), ->links(), etc.
+        $page = (int) request()->get('page', 1);
+        $perPage = 15;
+        $total = $stocks->count();
+        $itemsForPage = $stocks->forPage($page, $perPage)->values();
+        $stocks = new LengthAwarePaginator($itemsForPage, $total, $perPage, $page, [
+            'path' => request()->url(),
+            'query' => request()->query(),
+        ]);
 
         // Get categories for filter
         $categories = \App\Models\Category::where('is_active', true)->get();
 
-        // Statistics
+        // Statistics - real-time count
+        $allStockItems = $warehouse->stockItems()->where('status', 'available')->get();
         $stats = [
-            'total_products' => $warehouse->warehouseProducts()->count(),
-            'total_quantity' => $warehouse->warehouseProducts()->sum('quantity'),
-            'low_stock' => $warehouse->warehouseProducts()->where('quantity', '>', 0)->where('quantity', '<=', 10)->count(),
-            'out_of_stock' => $warehouse->warehouseProducts()->where('quantity', '<=', 0)->count(),
+            'total_products' => $allStockItems->groupBy('product_id')->count(),
+            'total_quantity' => $allStockItems->count(),
+            'low_stock' => $allStockItems->groupBy('product_id')->filter(function($items) {
+                return $items->count() > 0 && $items->count() <= 10;
+            })->count(),
+            'out_of_stock' => 0 // No products actually out of stock since we filter by available
         ];
 
         return view('admin.warehouses.stock', compact('warehouse', 'stocks', 'categories', 'stats'));
@@ -316,7 +400,7 @@ class WarehouseController extends Controller
         $errors = [];
 
         try {
-            \DB::beginTransaction();
+            DB::beginTransaction();
 
             foreach ($request->items as $item) {
                 try {
@@ -357,13 +441,13 @@ class WarehouseController extends Controller
             }
 
             if (count($errors) > 0) {
-                \DB::rollBack();
+                DB::rollBack();
                 return redirect()->back()
                                ->withErrors(['bulk_errors' => $errors])
                                ->withInput();
             }
 
-            \DB::commit();
+            DB::commit();
 
             $successMessage = "ดำเนินการสำเร็จ " . count($results) . " รายการ:\n" . implode("\n", $results);
             
@@ -371,7 +455,7 @@ class WarehouseController extends Controller
                            ->with('success', $successMessage);
 
         } catch (\Exception $e) {
-            \DB::rollBack();
+            DB::rollBack();
             return redirect()->back()->with('error', 'เกิดข้อผิดพลาด: ' . $e->getMessage());
         }
     }

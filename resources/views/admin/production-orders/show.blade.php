@@ -77,6 +77,14 @@
                                         {{ $productionOrder->targetWarehouse->name }}
                                     </td>
                                 </tr>
+                                @if($productionOrder->storage_location)
+                                <tr>
+                                    <th><i class="fas fa-map-marker-alt"></i> ตำแหน่งเก็บ:</th>
+                                    <td>
+                                        <code class="bg-light px-2 py-1 rounded">{{ $productionOrder->storage_location }}</code>
+                                    </td>
+                                </tr>
+                                @endif
                                 <tr>
                                     <th>จำนวนที่สั่งผลิต:</th>
                                     <td><strong class="text-primary">{{ number_format($productionOrder->quantity) }} รายการ</strong></td>
@@ -254,8 +262,8 @@
                             <i class="fas fa-times"></i> ยกเลิก
                         </button>
                     @elseif($productionOrder->status === 'in_production')
-                        <button type="button" class="btn btn-success btn-block mb-2" onclick="updateStatus('completed')">
-                            <i class="fas fa-check"></i> เสร็จแล้ว
+                        <button type="button" class="btn btn-success btn-block mb-2" data-toggle="modal" data-target="#completeProductionModal">
+                            <i class="fas fa-check"></i> เสร็จแล้ว - บันทึกจำนวนผลิต
                         </button>
                         <button type="button" class="btn btn-warning btn-block mb-2" onclick="updateStatus('pending')">
                             <i class="fas fa-arrow-left"></i> กลับเป็นรอดำเนินการ
@@ -264,32 +272,22 @@
                             <i class="fas fa-times"></i> ยกเลิก
                         </button>
                     @elseif($productionOrder->status === 'completed')
-                        @if(is_null($productionOrder->produced_quantity) || $productionOrder->produced_quantity <= 0)
-                            <button type="button" class="btn btn-primary btn-block mb-2" data-toggle="modal" data-target="#updateQuantityModal">
-                                <i class="fas fa-edit"></i> บันทึกจำนวนที่ผลิตจริง
-                            </button>
-                        @else
-                            <div class="alert alert-success text-center">
-                                <i class="fas fa-check-circle"></i><br>
-                                <strong>ผลิตเสร็จแล้ว</strong><br>
-                                จำนวน: {{ number_format($productionOrder->produced_quantity) }} รายการ
+                        <div class="alert alert-success text-center">
+                            <i class="fas fa-check-circle"></i><br>
+                            <strong>ผลิตเสร็จแล้ว</strong><br>
+                            จำนวน: {{ number_format($productionOrder->produced_quantity) }} รายการ
+                        </div>
+                        @php
+                            // ตรวจสอบว่ามีการ pull สต๊อกแล้วหรือยัง
+                            $hasStockTransaction = \App\Models\InventoryTransaction::where('reference_type', 'production_order')
+                                ->where('reference_id', $productionOrder->id)
+                                ->exists();
+                        @endphp
+                        @if($hasStockTransaction)
+                            <div class="alert alert-info text-center mb-2">
+                                <i class="fas fa-check-double"></i><br>
+                                <strong>Pull สต๊อกเรียบร้อยแล้ว</strong>
                             </div>
-                            @php
-                                // ตรวจสอบว่ามีการ pull สต๊อกแล้วหรือยัง
-                                $hasStockTransaction = \App\Models\InventoryTransaction::where('reference_type', 'production_order')
-                                    ->where('reference_id', $productionOrder->id)
-                                    ->exists();
-                            @endphp
-                            @if(!$hasStockTransaction)
-                                <button type="button" class="btn btn-warning btn-block mb-2" data-toggle="modal" data-target="#updateQuantityModal">
-                                    <i class="fas fa-exclamation-triangle"></i> ยังไม่ได้ pull สต๊อก - กรุณาปรับจำนวน
-                                </button>
-                            @else
-                                <div class="alert alert-info text-center">
-                                    <i class="fas fa-check-double"></i><br>
-                                    <strong>Pull สต๊อกเรียบร้อยแล้ว</strong>
-                                </div>
-                            @endif
                         @endif
                         <button type="button" class="btn btn-warning btn-block" onclick="updateStatus('in_production')">
                             <i class="fas fa-arrow-left"></i> กลับเป็นกำลังผลิต
@@ -311,7 +309,93 @@
         </div>
     </div>
 
-    <!-- Update Status Modal -->
+    <!-- Complete Production Modal (รวม update status + produced quantity) -->
+    <div class="modal fade" id="completeProductionModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-success text-white">
+                    <h4 class="modal-title">
+                        <i class="fas fa-check-circle"></i> บันทึกการผลิตเสร็จสิ้น
+                    </h4>
+                    <button type="button" class="close text-white" data-dismiss="modal">
+                        <span>&times;</span>
+                    </button>
+                </div>
+                <form action="{{ route('admin.production-orders.update-produced-quantity', $productionOrder) }}" method="POST">
+                    @csrf
+                    <input type="hidden" name="complete_production" value="1">
+                    <div class="modal-body">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle"></i>
+                            <strong>กรุณาระบุจำนวนที่ผลิตจริง</strong><br>
+                            ระบบจะเปลี่ยนสถานะเป็น "เสร็จแล้ว" และสร้าง StockItem ให้อัตโนมัติ
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>จำนวนที่สั่งผลิต:</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" value="{{ number_format($productionOrder->quantity) }}" disabled>
+                                <div class="input-group-append">
+                                    <span class="input-group-text">รายการ</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>จำนวนที่ผลิตจริง <span class="text-danger">*</span></label>
+                            <div class="input-group">
+                                <input type="number" 
+                                       class="form-control form-control-lg" 
+                                       name="produced_quantity" 
+                                       value="{{ $productionOrder->quantity }}"
+                                       min="0" 
+                                       max="{{ $productionOrder->quantity }}"
+                                       required
+                                       autofocus>
+                                <div class="input-group-append">
+                                    <span class="input-group-text">รายการ</span>
+                                </div>
+                            </div>
+                            <small class="form-text text-muted">
+                                ระบุจำนวนที่ผลิตได้จริง (สูงสุด {{ number_format($productionOrder->quantity) }} รายการ)
+                            </small>
+                        </div>
+
+                        <div class="form-group">
+                            <label>หมายเหตุ</label>
+                            <textarea class="form-control" 
+                                      name="notes" 
+                                      rows="3" 
+                                      placeholder="หมายเหตุเกี่ยวกับการผลิต (ถ้ามี)"></textarea>
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle"></i>
+                            <strong>หมายเหตุ:</strong> เมื่อกดบันทึก ระบบจะ:
+                            <ul class="mb-0 mt-2">
+                                <li>เปลี่ยนสถานะเป็น "เสร็จแล้ว"</li>
+                                <li>สร้าง StockItem แยกแต่ละชิ้น (พร้อม Barcode + Serial Number)</li>
+                                <li>บันทึกรายการเข้าสต๊อก (InventoryTransaction)</li>
+                                @if($productionOrder->storage_location)
+                                    <li>จัดเก็บที่ตำแหน่ง: <code>{{ $productionOrder->storage_location }}</code></li>
+                                @endif
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">
+                            <i class="fas fa-times"></i> ยกเลิก
+                        </button>
+                        <button type="submit" class="btn btn-success btn-lg">
+                            <i class="fas fa-check"></i> บันทึกและเสร็จสิ้น
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Update Status Modal (สำหรับเปลี่ยนสถานะอื่นๆ) -->
     <div class="modal fade" id="updateStatusModal" tabindex="-1">
         <div class="modal-dialog">
             <div class="modal-content">
@@ -341,51 +425,6 @@
             </div>
         </div>
     </div>
-
-    <!-- Update Quantity Modal (for completed status) -->
-    @if($productionOrder->status === 'completed')
-        <div class="modal fade" id="updateQuantityModal" tabindex="-1">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h4 class="modal-title">บันทึกจำนวนที่ผลิตจริง</h4>
-                        <button type="button" class="close" data-dismiss="modal">
-                            <span>&times;</span>
-                        </button>
-                    </div>
-                    <form action="{{ route('admin.production-orders.update-produced-quantity', $productionOrder) }}" method="POST">
-                        @csrf
-                        <div class="modal-body">
-                            <div class="form-group">
-                                <label>จำนวนที่ผลิตจริง <span class="text-danger">*</span></label>
-                                <input type="number" 
-                                       class="form-control" 
-                                       name="produced_quantity" 
-                                       value="{{ $productionOrder->produced_quantity }}"
-                                       min="0" 
-                                       max="{{ $productionOrder->quantity }}"
-                                       required>
-                                <small class="form-text text-muted">
-                                    จำนวนที่สั่งผลิต: {{ number_format($productionOrder->quantity) }} รายการ
-                                </small>
-                            </div>
-                            <div class="form-group">
-                                <label>หมายเหตุ</label>
-                                <textarea class="form-control" 
-                                          name="notes" 
-                                          rows="3" 
-                                          placeholder="หมายเหตุเกี่ยวกับการผลิต"></textarea>
-                            </div>
-                        </div>
-                        <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-dismiss="modal">ยกเลิก</button>
-                            <button type="submit" class="btn btn-primary">บันทึก</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
-        </div>
-    @endif
 @stop
 
 @section('js')

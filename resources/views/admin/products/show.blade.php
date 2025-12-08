@@ -289,6 +289,7 @@
                                                     {{ $stockItem->status_text }}
                                                 </span>
                                             </td>
+                                            
                                             <td>{{ $stockItem->location_code ?? '-' }}</td>
                                             <td>{{ $stockItem->received_date ? $stockItem->received_date->format('d/m/Y') : '-' }}</td>
                                             <td>

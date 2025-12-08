@@ -14,6 +14,7 @@ class ProductionOrder extends Model
         'product_id',
         'package_id',
         'target_warehouse_id',
+        'storage_location',
         'quantity',
         'produced_quantity',
         'production_cost',

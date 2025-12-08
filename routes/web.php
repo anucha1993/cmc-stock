@@ -16,9 +16,14 @@ use App\Http\Controllers\PackageController;
 use App\Http\Controllers\Admin\StockItemController;
 use App\Http\Controllers\StockAdjustmentRequestController;
 use App\Http\Controllers\BarcodeLabelController;
+use App\Http\Controllers\StockCheckController;
+use App\Http\Controllers\StockCheckSubmissionController;
 
 Route::get('/', function () {
-    return view('welcome');
+    if (Auth::check()) {
+        return redirect()->route('admin.dashboard');
+    }
+    return redirect()->route('login');
 });
 
 // Authentication Routes
@@ -87,6 +92,25 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         
         // API Routes for Stock Adjustments
         Route::get('api/warehouse-stock/{warehouse}/{product}', [StockAdjustmentRequestController::class, 'getWarehouseStock'])->name('api.warehouse-stock');
+        
+        // Stock Check Management
+        Route::resource('stock-checks', StockCheckController::class);
+        Route::get('stock-checks/{stockCheck}/scan', [StockCheckController::class, 'scan'])->name('stock-checks.scan');
+        Route::post('stock-checks/{stockCheck}/process-scan', [StockCheckController::class, 'processScan'])->name('stock-checks.process-scan');
+        Route::get('stock-checks/{stockCheck}/report', [StockCheckController::class, 'report'])->name('stock-checks.report');
+        Route::post('stock-checks/{stockCheck}/complete', [StockCheckController::class, 'complete'])->name('stock-checks.complete');
+        Route::post('stock-checks/{stockCheck}/generate-adjustment', [StockCheckController::class, 'generateAdjustment'])->name('stock-checks.generate-adjustment');
+        Route::post('stock-checks/{stockCheck}/submit', [StockCheckController::class, 'submitForApproval'])->name('stock-checks.submit');
+        
+        // API Routes for Stock Check
+        Route::get('api/stock-checks/{stockCheck}/stats', [StockCheckController::class, 'getStats'])->name('api.stock-checks.stats');
+        Route::get('api/stock-checks/{stockCheck}/recent-scans', [StockCheckController::class, 'getRecentScans'])->name('api.stock-checks.recent-scans');
+        
+        // Stock Check Submissions (Admin approval workflow)
+        Route::resource('stock-check-submissions', StockCheckSubmissionController::class)->only(['index', 'show'])->parameters(['stock-check-submissions' => 'submission']);
+        Route::get('stock-check-submissions/{submission}/review', [StockCheckSubmissionController::class, 'review'])->name('stock-check-submissions.review');
+        Route::post('stock-check-submissions/{submission}/process-decision', [StockCheckSubmissionController::class, 'processDecision'])->name('stock-check-submissions.process-decision');
+        Route::post('stock-check-submissions/{submission}/request-recheck', [StockCheckSubmissionController::class, 'requestRecheck'])->name('stock-check-submissions.request-recheck');
         
         // Barcode Label System
         Route::get('barcode-labels', [BarcodeLabelController::class, 'index'])->name('barcode-labels.index');

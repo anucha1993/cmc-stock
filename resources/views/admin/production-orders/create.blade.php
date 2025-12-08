@@ -51,6 +51,26 @@
                             </div>
                             <div class="col-md-4">
                                 <div class="form-group">
+                                    <label for="storage_location">
+                                        <i class="fas fa-map-marker-alt"></i> ตำแหน่งเก็บในคลัง
+                                        <small class="text-muted">(ไม่บังคับ)</small>
+                                    </label>
+                                    <input type="text" 
+                                           class="form-control @error('storage_location') is-invalid @enderror" 
+                                           id="storage_location" 
+                                           name="storage_location" 
+                                           value="{{ old('storage_location') }}"
+                                           placeholder="เช่น A1-01, SHELF-A-001, ZONE-B-05">
+                                    <small class="form-text text-muted">
+                                        ระบุตำแหน่งที่จะจัดเก็บสินค้าเมื่อผลิตเสร็จ
+                                    </small>
+                                    @error('storage_location')
+                                        <span class="invalid-feedback">{{ $message }}</span>
+                                    @enderror
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="form-group">
                                     <label for="due_date">วันที่ต้องการ <span class="text-danger">*</span></label>
                                     <input type="date" 
                                            class="form-control @error('due_date') is-invalid @enderror" 

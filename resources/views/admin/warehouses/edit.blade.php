@@ -65,13 +65,13 @@
                         <div class="row">
                             <div class="col-md-12">
                                 <div class="form-group">
-                                    <label for="location">ที่อยู่/สถานที่</label>
-                                    <textarea class="form-control @error('location') is-invalid @enderror" 
-                                              id="location" 
-                                              name="location" 
+                                    <label for="address">ที่อยู่/สถานที่</label>
+                                    <textarea class="form-control @error('address') is-invalid @enderror" 
+                                              id="address" 
+                                              name="address" 
                                               rows="3" 
-                                              placeholder="ที่อยู่หรือสถานที่ตั้งคลัง">{{ old('location', $warehouse->location) }}</textarea>
-                                    @error('location')
+                                              placeholder="ที่อยู่หรือสถานที่ตั้งคลัง">{{ old('address', $warehouse->address) }}</textarea>
+                                    @error('address')
                                         <span class="invalid-feedback">{{ $message }}</span>
                                     @enderror
                                 </div>
