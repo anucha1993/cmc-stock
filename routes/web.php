@@ -18,6 +18,7 @@ use App\Http\Controllers\StockAdjustmentRequestController;
 use App\Http\Controllers\BarcodeLabelController;
 use App\Http\Controllers\StockCheckController;
 use App\Http\Controllers\StockCheckSubmissionController;
+use App\Http\Controllers\DeliveryNoteController;
 
 Route::get('/', function () {
     if (Auth::check()) {
@@ -119,6 +120,16 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     // Product-level printing when there are no StockItem rows (generate labels from product SKU/barcode)
     Route::post('barcode-labels/print-product', [BarcodeLabelController::class, 'printProduct'])->name('barcode-labels.print-product');
         Route::get('api/barcode-labels/product/{product}/stock-items', [BarcodeLabelController::class, 'getStockItems'])->name('api.barcode-labels.stock-items');
+        
+        // Delivery Notes / Sales Stock Cut
+        Route::resource('delivery-notes', DeliveryNoteController::class);
+        Route::post('delivery-notes/{deliveryNote}/confirm', [DeliveryNoteController::class, 'confirm'])->name('delivery-notes.confirm');
+        Route::get('delivery-notes/{deliveryNote}/scan', [DeliveryNoteController::class, 'scan'])->name('delivery-notes.scan');
+        Route::post('delivery-notes/{deliveryNote}/scan', [DeliveryNoteController::class, 'storeScan'])->name('delivery-notes.store-scan');
+        Route::delete('delivery-notes/{deliveryNote}/scan', [DeliveryNoteController::class, 'removeScan'])->name('delivery-notes.remove-scan');
+        Route::get('delivery-notes/{deliveryNote}/review', [DeliveryNoteController::class, 'review'])->name('delivery-notes.review');
+        Route::post('delivery-notes/{deliveryNote}/approve', [DeliveryNoteController::class, 'approve'])->name('delivery-notes.approve');
+        Route::get('delivery-notes/{deliveryNote}/print', [DeliveryNoteController::class, 'print'])->name('delivery-notes.print');
         
         // Warehouse Management
         Route::resource('warehouses', WarehouseController::class);

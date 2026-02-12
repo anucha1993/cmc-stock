@@ -47,7 +47,7 @@
                             <strong>เริ่มเมื่อ:</strong> {{ $stockCheck->started_at->format('d/m/Y H:i') }}<br>
                         </div>
                         <div class="col-sm-6">
-                            <strong>ผู้สร้าง:</strong> {{ $stockCheck->creator->name }}<br>
+                            <strong>ผู้สร้าง:</strong> {{ $stockCheck->creator->name ?? 'N/A' }}<br>
                             @if($stockCheck->completed_at)
                                 <strong>เสร็จเมื่อ:</strong> {{ $stockCheck->completed_at->format('d/m/Y H:i') }}<br>
                                 <strong>ผู้ปิด:</strong> {{ $stockCheck->completedBy->name ?? 'N/A' }}<br>

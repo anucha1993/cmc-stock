@@ -418,6 +418,12 @@ return [
                 ],
             ],
         ],
+        [
+            'text' => 'ใบตัดสต็อก',
+            'route' => 'admin.delivery-notes.index',
+            'icon' => 'fas fa-fw fa-file-invoice',
+            'can' => 'manage-users',
+        ],
         
         ['header' => 'จัดการผู้ใช้งาน'],
         [
