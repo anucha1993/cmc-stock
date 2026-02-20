@@ -1,6 +1,6 @@
 @extends('adminlte::page')
 
-@section('title', 'แก้ไขสินค้า: ' . $product->name)
+@section('title', 'แก้ไขสินค้า: ' . $product->full_name)
 
 @section('content_header')
     <div class="row">
@@ -11,7 +11,7 @@
             <ol class="breadcrumb float-sm-right">
                 <li class="breadcrumb-item"><a href="{{ route('admin.dashboard') }}">หน้าหลัก</a></li>
                 <li class="breadcrumb-item"><a href="{{ route('admin.products.index') }}">สินค้า</a></li>
-                <li class="breadcrumb-item"><a href="{{ route('admin.products.show', $product) }}">{{ $product->name }}</a></li>
+                <li class="breadcrumb-item"><a href="{{ route('admin.products.show', $product) }}">{{ $product->full_name }}</a></li>
                 <li class="breadcrumb-item active">แก้ไข</li>
             </ol>
         </div>
@@ -512,7 +512,7 @@
                                             </div>
                                             <div class="card-body">
                                                 <div id="productPreview">
-                                                    <h6 id="previewName">{{ $product->name }}</h6>
+                                                    <h6 id="previewName">{{ $product->full_name }}</h6>
                                                     <p id="previewCategory" class="mb-1">
                                                         <span class="badge badge-secondary" style="background-color: {{ $product->category->color ?? '#6c757d' }};">{{ $product->category->name ?? 'หมวดหมู่' }}</span>
                                                     </p>

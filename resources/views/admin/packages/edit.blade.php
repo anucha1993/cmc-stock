@@ -333,7 +333,7 @@
                                         data-name="{{ $product->name }}"
                                         data-unit="{{ $product->unit }}"
                                         data-category="{{ $product->category->name ?? '' }}">
-                                    {{ $product->name }} | {{ $product->unit }} | {{ $product->category->name ?? '' }}
+                                    {{ $product->full_name }} | {{ $product->unit }} | {{ $product->category->name ?? '' }}
                                 </option>
                             @endforeach
                         </select>

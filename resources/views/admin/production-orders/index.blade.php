@@ -94,9 +94,11 @@
         <div class="card-header">
             <h3 class="card-title">รายการใบสั่งผลิต</h3>
             <div class="card-tools">
+                @can('create-edit')
                 <a href="{{ route('admin.production-orders.create') }}" class="btn btn-primary btn-sm">
                     <i class="fas fa-plus"></i> สร้างใบสั่งผลิต
                 </a>
+                @endcan
                 <a href="{{ route('admin.production-orders.dashboard') }}" class="btn btn-success btn-sm">
                     <i class="fas fa-tachometer-alt"></i> แดชบอร์ด
                 </a>
@@ -252,10 +254,12 @@
                                         </a>
                                         
                                         @if($order->status == 'pending')
+                                            @can('create-edit')
                                             <a href="{{ route('admin.production-orders.edit', $order) }}" 
                                                class="btn btn-warning" title="แก้ไข">
                                                 <i class="fas fa-edit"></i>
                                             </a>
+                                            @endcan
                                             <button type="button" class="btn btn-success" 
                                                     onclick="updateStatus({{ $order->id }}, 'in_production')" title="เริ่มผลิต">
                                                 <i class="fas fa-play"></i>
@@ -330,29 +334,6 @@
 
 
 
-    <div class="modal fade" id="cancelModal" tabindex="-1" role="dialog">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">ยืนยันการยกเลิก</h5>
-                    <button type="button" class="close" data-dismiss="modal">
-                        <span>&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    <p>คุณแน่ใจหรือไม่ที่จะยกเลิกใบสั่งผลิตนี้?</p>
-                    <p class="text-warning"><i class="fas fa-exclamation-triangle"></i> การดำเนินการนี้ไม่สามารถยกเลิกได้</p>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">ยกเลิก</button>
-                    <form id="cancelForm" method="POST" style="display: inline;">
-                        @csrf
-                        <button type="submit" class="btn btn-danger">ยกเลิก</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
 @stop
 
 @section('css')
@@ -389,8 +370,10 @@
 
 
         function confirmCancel(orderId) {
-            $('#cancelForm').attr('action', '/admin/production-orders/' + orderId + '/cancel');
-            $('#cancelModal').modal('show');
+            $('#statusForm').attr('action', '/admin/production-orders/' + orderId + '/update-status');
+            $('#statusInput').val('cancelled');
+            $('#statusMessage').text('คุณแน่ใจหรือไม่ที่จะยกเลิกใบสั่งผลิตนี้? การดำเนินการนี้ไม่สามารถย้อนกลับได้');
+            $('#statusModal').modal('show');
         }
 
         // Alert auto hide

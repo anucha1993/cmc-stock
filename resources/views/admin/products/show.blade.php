@@ -1,6 +1,6 @@
 @extends('adminlte::page')
 
-@section('title', 'รายละเอียดสินค้า: ' . $product->name)
+@section('title', 'รายละเอียดสินค้า: ' . $product->full_name)
 
 @section('content_header')
     <div class="row">
@@ -11,7 +11,7 @@
             <ol class="breadcrumb float-sm-right">
                 <li class="breadcrumb-item"><a href="{{ route('admin.dashboard') }}">หน้าหลัก</a></li>
                 <li class="breadcrumb-item"><a href="{{ route('admin.products.index') }}">สินค้า</a></li>
-                <li class="breadcrumb-item active">{{ $product->name }}</li>
+                <li class="breadcrumb-item active">{{ $product->full_name }}</li>
             </ol>
         </div>
     </div>
@@ -38,7 +38,7 @@
                             <dl class="row">
                                 <dt class="col-sm-4">ชื่อสินค้า:</dt>
                                 <dd class="col-sm-8">
-                                    <h5>{{ $product->name }}</h5>
+                                    <h5>{{ $product->full_name }}</h5>
                                 </dd>
                                 
                                 <dt class="col-sm-4">รหัสสินค้า:</dt>
@@ -618,7 +618,7 @@
                 title: 'ยืนยันการลบ',
                 html: `
                     <div class="text-left">
-                        <p>คุณต้องการลบสินค้า <strong>"{{ $product->name }}"</strong> หรือไม่?</p>
+                        <p>คุณต้องการลบสินค้า <strong>"{{ $product->full_name }}"</strong> หรือไม่?</p>
                         <div class="alert alert-warning">
                             <i class="fas fa-exclamation-triangle"></i>
                             <strong>คำเตือน:</strong> การลบสินค้าจะส่งผลต่อ:
@@ -654,7 +654,7 @@
             printWindow.document.write(`
                 <html>
                 <head>
-                    <title>Barcode - {{ $product->name }}</title>
+                    <title>Barcode - {{ $product->full_name }}</title>
                     <style>
                         body { 
                             font-family: Arial, sans-serif; 
@@ -680,7 +680,7 @@
                 </head>
                 <body>
                     <div class="barcode">{{ $product->barcode }}</div>
-                    <div class="product-name">{{ $product->name }}</div>
+                    <div class="product-name">{{ $product->full_name }}</div>
                     <div class="product-info">{{ $product->category->name ?? '' }} | {{ $product->unit }}</div>
                     <script>
                         window.print();

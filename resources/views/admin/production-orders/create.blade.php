@@ -412,7 +412,7 @@
                                                 data-sku="{{ $product->sku }}"
                                                 data-unit="{{ $product->unit }}"
                                                 data-cost="{{ $product->cost_price }}">
-                                            {{ $product->name }} ({{ $product->sku }})
+                                            {{ $product->full_name }} ({{ $product->sku }})
                                         </option>
                                     @endforeach
                                 </select>

@@ -198,23 +198,14 @@ class StockItemController extends Controller
     }
 
     /**
-     * สร้าง QR Code สำหรับสินค้า
+     * สร้าง Barcode สำหรับสินค้า
      */
-    public function generateQR(StockItem $stockItem)
+    public function generateBarcode(StockItem $stockItem)
     {
-        // ข้อมูลที่จะใส่ใน QR Code
-        $qrData = [
-            'id' => $stockItem->id,
-            'barcode' => $stockItem->barcode,
-            'product' => $stockItem->product->name,
-            'warehouse' => $stockItem->warehouse->name,
-            'status' => $stockItem->status
-        ];
-
         return response()->json([
             'success' => true,
-            'data' => json_encode($qrData),
-            'barcode' => $stockItem->barcode
+            'barcode' => $stockItem->barcode,
+            'product' => $stockItem->product->name
         ]);
     }
 

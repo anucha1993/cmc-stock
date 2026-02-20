@@ -47,7 +47,7 @@
                                         <option value="">-- เลือกสินค้า --</option>
                                         @foreach($products as $product)
                                             <option value="{{ $product->id }}" {{ old('product_id', $stockItem->product_id) == $product->id ? 'selected' : '' }}>
-                                                {{ $product->name }} ({{ $product->code }})
+                                                {{ $product->full_name }} ({{ $product->code }})
                                             </option>
                                         @endforeach
                                     </select>
@@ -336,8 +336,8 @@
                     <a href="{{ route('admin.stock-items.show', $stockItem) }}" class="btn btn-info btn-block">
                         <i class="fas fa-eye"></i> ดูรายละเอียด
                     </a>
-                    <button type="button" class="btn btn-success btn-block" onclick="generateQR({{ $stockItem->id }})">
-                        <i class="fas fa-qrcode"></i> สร้าง QR Code
+                    <button type="button" class="btn btn-success btn-block" onclick="generateBarcode({{ $stockItem->id }})">
+                        <i class="fas fa-barcode"></i> สร้าง Barcode
                     </button>
                     <form action="{{ route('admin.stock-items.destroy', $stockItem) }}" method="POST" style="display: inline-block; width: 100%;" onsubmit="return confirm('คุณแน่ใจที่จะลบรายการนี้?')">
                         @csrf
@@ -352,23 +352,23 @@
     </div>
 </div>
 
-<!-- QR Code Modal -->
-<div class="modal fade" id="qrModal" tabindex="-1" role="dialog">
-    <div class="modal-dialog modal-sm" role="document">
+<!-- Barcode Modal -->
+<div class="modal fade" id="barcodeModal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document">
         <div class="modal-content">
             <div class="modal-header">
-                <h5 class="modal-title">QR Code</h5>
+                <h5 class="modal-title"><i class="fas fa-barcode"></i> Barcode</h5>
                 <button type="button" class="close" data-dismiss="modal">
                     <span>&times;</span>
                 </button>
             </div>
             <div class="modal-body text-center">
-                <div id="qrcode"></div>
-                <p class="mt-2" id="qrBarcode"></p>
+                <svg id="barcode-svg"></svg>
+                <p class="mt-2" id="barcodeText"></p>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-dismiss="modal">ปิด</button>
-                <button type="button" class="btn btn-primary" onclick="printQR()">พิมพ์</button>
+                <button type="button" class="btn btn-primary" onclick="printBarcode()">พิมพ์</button>
             </div>
         </div>
     </div>
@@ -382,7 +382,7 @@
 
 @section('js')
     <script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script>
         $(document).ready(function() {
             $('.select2').select2({
@@ -392,52 +392,51 @@
             });
         });
 
-        function generateQR(stockItemId) {
-            fetch(`/admin/stock-items/${stockItemId}/generate-qr`)
+        function generateBarcode(stockItemId) {
+            fetch(`/admin/stock-items/${stockItemId}/generate-barcode`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // Clear previous QR code
-                        document.getElementById('qrcode').innerHTML = '';
-                        
-                        // Generate new QR code
-                        QRCode.toCanvas(document.getElementById('qrcode'), data.data, {
-                            width: 200,
-                            height: 200
+                        JsBarcode('#barcode-svg', data.barcode, {
+                            format: 'CODE128',
+                            width: 2,
+                            height: 80,
+                            displayValue: true,
+                            fontSize: 16,
+                            margin: 10
                         });
-                        
-                        document.getElementById('qrBarcode').textContent = data.barcode;
-                        $('#qrModal').modal('show');
+                        document.getElementById('barcodeText').textContent = data.product;
+                        $('#barcodeModal').modal('show');
                     } else {
-                        alert('เกิดข้อผิดพลาดในการสร้าง QR Code');
+                        alert('เกิดข้อผิดพลาดในการสร้าง Barcode');
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    alert('เกิดข้อผิดพลาดในการสร้าง QR Code');
+                    alert('เกิดข้อผิดพลาดในการสร้าง Barcode');
                 });
         }
 
-        function printQR() {
-            const printWindow = window.open('', '_blank');
-            const qrCanvas = document.querySelector('#qrcode canvas');
-            const barcode = document.getElementById('qrBarcode').textContent;
+        function printBarcode() {
+            const svgElement = document.getElementById('barcode-svg');
+            const productText = document.getElementById('barcodeText').textContent;
             
-            if (qrCanvas) {
-                const dataURL = qrCanvas.toDataURL();
+            if (svgElement) {
+                const svgData = new XMLSerializer().serializeToString(svgElement);
+                const printWindow = window.open('', '_blank');
                 printWindow.document.write(`
                     <html>
                         <head>
-                            <title>QR Code</title>
+                            <title>Barcode</title>
                             <style>
-                                body { text-align: center; margin: 20px; }
-                                img { margin: 20px 0; }
-                                p { font-family: monospace; font-size: 14px; }
+                                body { text-align: center; margin: 20px; font-family: Arial, sans-serif; }
+                                svg { margin: 20px 0; }
+                                .product { font-size: 14px; margin-top: 10px; }
                             </style>
                         </head>
                         <body>
-                            <img src="${dataURL}" alt="QR Code">
-                            <p>${barcode}</p>
+                            ${svgData}
+                            <div class="product">${productText}</div>
                             <script>window.print(); window.close();</script>
                         </body>
                     </html>

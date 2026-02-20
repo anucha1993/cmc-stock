@@ -193,7 +193,7 @@
                                     @forelse($productionOrder->items as $item)
                                         <tr>
                                             <td>
-                                                <strong>{{ $item->product->name }}</strong><br>
+                                                <strong>{{ $item->product->full_name }}</strong><br>
                                                 <small class="text-muted">SKU: {{ $item->product->sku }}</small>
                                             </td>
                                             <td class="text-center">
@@ -255,13 +255,16 @@
                 </div>
                 <div class="card-body">
                     @if($productionOrder->status === 'pending')
+                        @can('approve')
                         <button type="button" class="btn btn-info btn-block mb-2" onclick="updateStatus('in_production')">
                             <i class="fas fa-play"></i> เริ่มผลิต
                         </button>
                         <button type="button" class="btn btn-danger btn-block" onclick="updateStatus('cancelled')">
                             <i class="fas fa-times"></i> ยกเลิก
                         </button>
+                        @endcan
                     @elseif($productionOrder->status === 'in_production')
+                        @can('approve')
                         <button type="button" class="btn btn-success btn-block mb-2" data-toggle="modal" data-target="#completeProductionModal">
                             <i class="fas fa-check"></i> เสร็จแล้ว - บันทึกจำนวนผลิต
                         </button>
@@ -271,6 +274,7 @@
                         <button type="button" class="btn btn-danger btn-block" onclick="updateStatus('cancelled')">
                             <i class="fas fa-times"></i> ยกเลิก
                         </button>
+                        @endcan
                     @elseif($productionOrder->status === 'completed')
                         <div class="alert alert-success text-center">
                             <i class="fas fa-check-circle"></i><br>
@@ -289,9 +293,11 @@
                                 <strong>Pull สต๊อกเรียบร้อยแล้ว</strong>
                             </div>
                         @endif
+                        @can('approve')
                         <button type="button" class="btn btn-warning btn-block" onclick="updateStatus('in_production')">
                             <i class="fas fa-arrow-left"></i> กลับเป็นกำลังผลิต
                         </button>
+                        @endcan
                     @endif
                     
                     <hr>
@@ -300,9 +306,11 @@
                     </a>
                     
                     @if(in_array($productionOrder->status, ['pending']))
+                        @can('create-edit')
                         <a href="{{ route('admin.production-orders.edit', $productionOrder) }}" class="btn btn-warning btn-block">
                             <i class="fas fa-edit"></i> แก้ไข
                         </a>
+                        @endcan
                     @endif
                 </div>
             </div>

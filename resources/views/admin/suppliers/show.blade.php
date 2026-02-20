@@ -178,7 +178,7 @@
                                         <tr>
                                             <td>
                                                 <a href="{{ route('admin.products.show', $product) }}">
-                                                    {{ $product->name }}
+                                                    {{ $product->full_name }}
                                                 </a>
                                             </td>
                                             <td><code>{{ $product->sku }}</code></td>

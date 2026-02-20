@@ -218,7 +218,7 @@
                                                         @forelse($productionOrder->items as $item)
                                                             <tr>
                                                                 <td>
-                                                                    <strong>{{ $item->product->name }}</strong><br>
+                                                                    <strong>{{ $item->product->full_name }}</strong><br>
                                                                     <small class="text-muted">SKU: {{ $item->product->sku }}</small>
                                                                 </td>
                                                                 <td class="text-center">

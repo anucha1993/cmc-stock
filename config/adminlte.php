@@ -63,12 +63,12 @@ return [
     |
     */
 
-    'logo' => '<b>Admin</b>LTE',
-    'logo_img' => 'vendor/adminlte/dist/img/AdminLTELogo.png',
+    'logo' => '<b>CMC</b>-STOCK',
+    'logo_img' => 'logo1.png',
     'logo_img_class' => 'brand-image img-circle elevation-3',
     'logo_img_xl' => null,
     'logo_img_xl_class' => 'brand-image-xs',
-    'logo_img_alt' => 'Admin Logo',
+    'logo_img_alt' => 'CMC-STOCK Logo',
 
     /*
     |--------------------------------------------------------------------------
@@ -86,8 +86,8 @@ return [
     'auth_logo' => [
         'enabled' => false,
         'img' => [
-            'path' => 'vendor/adminlte/dist/img/AdminLTELogo.png',
-            'alt' => 'Auth Logo',
+            'path' => 'logo1.png',
+            'alt' => 'CMC-STOCK Logo',
             'class' => '',
             'width' => 50,
             'height' => 50,
@@ -113,8 +113,8 @@ return [
         'enabled' => true,
         'mode' => 'fullscreen',
         'img' => [
-            'path' => 'vendor/adminlte/dist/img/AdminLTELogo.png',
-            'alt' => 'AdminLTE Preloader Image',
+            'path' => 'logo1.png',
+            'alt' => 'CMC-STOCK Preloader',
             'effect' => 'animation__shake',
             'width' => 60,
             'height' => 60,
@@ -317,43 +317,64 @@ return [
             'icon' => 'fas fa-fw fa-tachometer-alt',
         ],
         
-        ['header' => 'จัดการคลังสินค้า'],
+        ['header' => 'จัดการคลังสินค้า', 'can' => 'view-data'],
         [
             'text' => 'สินค้า',
             'route' => 'admin.products.index',
             'icon' => 'fas fa-fw fa-boxes',
-            'can' => 'manage-users',
+            'can' => 'view-data',
         ],
         [
             'text' => 'หมวดหมู่สินค้า',
             'route' => 'admin.categories.index',
             'icon' => 'fas fa-fw fa-tags',
-            'can' => 'manage-users',
+            'can' => 'view-data',
         ],
         [
             'text' => 'ผู้จำหน่าย',
             'route' => 'admin.suppliers.index',
             'icon' => 'fas fa-fw fa-truck',
-            'can' => 'manage-users',
+            'can' => 'view-data',
         ],
         [
             'text' => 'แพสินค้า',
             'route' => 'admin.packages.index',
             'icon' => 'fas fa-fw fa-archive',
-            'can' => 'manage-users',
+            'can' => 'view-data',
         ],
         [
-            'text' => 'พิมพ์ Label Barcode',
-            'route' => 'admin.barcode-labels.index',
+            'text' => 'Label Barcode',
             'icon' => 'fas fa-fw fa-print',
-            'can' => 'manage-users',
+            'can' => 'print-barcode',
+            'submenu' => [
+                [
+                    'text' => 'พิมพ์ Label',
+                    'route' => 'admin.barcode-labels.index',
+                    'icon' => 'fas fa-fw fa-print',
+                ],
+                [
+                    'text' => 'สแกนยืนยัน',
+                    'route' => 'admin.barcode-labels.verify',
+                    'icon' => 'fas fa-fw fa-barcode',
+                ],
+                [
+                    'text' => 'ประวัติการพิมพ์',
+                    'route' => 'admin.barcode-labels.history',
+                    'icon' => 'fas fa-fw fa-history',
+                ],
+                [
+                    'text' => 'เงื่อนไข / คู่มือ',
+                    'route' => 'admin.barcode-labels.docs',
+                    'icon' => 'fas fa-fw fa-book',
+                ],
+            ],
         ],
         
-        ['header' => 'จัดการคลัง'],
+        ['header' => 'จัดการคลัง', 'can' => 'view-data'],
         [
             'text' => 'คลังสินค้า',
             'icon' => 'fas fa-fw fa-warehouse',
-            'can' => 'manage-users',
+            'can' => 'view-data',
             'submenu' => [
                 [
                     'text' => 'จัดการคลัง',
@@ -376,18 +397,18 @@ return [
             'text' => 'คำขอปรับปรุงสต็อก',
             'route' => 'admin.stock-adjustments.index',
             'icon' => 'fas fa-fw fa-clipboard-list',
-            'can' => 'manage-users',
+            'can' => 'stock-operations',
         ],
         [
             'text' => 'โอนย้ายสินค้า',
             'route' => 'admin.transfers.index',
             'icon' => 'fas fa-fw fa-exchange-alt',
-            'can' => 'manage-users',
+            'can' => 'view-data',
         ],
         [
             'text' => 'ตรวจนับสต๊อก',
             'icon' => 'fas fa-fw fa-clipboard-check',
-            'can' => 'manage-users',
+            'can' => 'stock-operations',
             'submenu' => [
                 [
                     'text' => 'ตรวจนับสต๊อก',
@@ -398,13 +419,14 @@ return [
                     'text' => 'รายการส่งตรวจสอบ',
                     'route' => 'admin.stock-check-submissions.index',
                     'icon' => 'fas fa-fw fa-clipboard-list',
+                    'can' => 'approve',
                 ],
             ],
         ],
         [
             'text' => 'สั่งผลิตสินค้า',
             'icon' => 'fas fa-fw fa-industry',
-            'can' => 'manage-users',
+            'can' => 'view-data',
             'submenu' => [
                 [
                     'text' => 'ใบสั่งผลิต',
@@ -422,10 +444,33 @@ return [
             'text' => 'ใบตัดสต็อก',
             'route' => 'admin.delivery-notes.index',
             'icon' => 'fas fa-fw fa-file-invoice',
-            'can' => 'manage-users',
+            'can' => 'view-delivery-notes',
+        ],
+        [
+            'text' => 'เคลมสินค้า',
+            'icon' => 'fas fa-fw fa-shield-alt',
+            'can' => 'view-data',
+            'submenu' => [
+                [
+                    'text' => 'รายการเคลม',
+                    'route' => 'admin.claims.index',
+                    'icon' => 'fas fa-fw fa-list',
+                ],
+                [
+                    'text' => 'สร้างใบเคลมใหม่',
+                    'route' => 'admin.claims.create',
+                    'icon' => 'fas fa-fw fa-plus-circle',
+                    'can' => 'create-edit',
+                ],
+                [
+                    'text' => 'รายงานสินค้าชำรุด',
+                    'route' => 'admin.claims.damaged-report',
+                    'icon' => 'fas fa-fw fa-exclamation-triangle',
+                ],
+            ],
         ],
         
-        ['header' => 'จัดการผู้ใช้งาน'],
+        ['header' => 'จัดการผู้ใช้งาน', 'can' => 'manage-users'],
         [
             'text' => 'ผู้ใช้งาน',
             'route' => 'admin.users.index',
@@ -530,12 +575,12 @@ return [
             ],
         ],
         'Sweetalert2' => [
-            'active' => false,
+            'active' => true,
             'files' => [
                 [
                     'type' => 'js',
                     'asset' => false,
-                    'location' => '//cdn.jsdelivr.net/npm/sweetalert2@8',
+                    'location' => '//cdn.jsdelivr.net/npm/sweetalert2@11',
                 ],
             ],
         ],

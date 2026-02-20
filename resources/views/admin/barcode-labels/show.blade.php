@@ -1,6 +1,6 @@
 @extends('adminlte::page')
 
-@section('title', 'เลือกรายการพิมพ์ Label - ' . $product->name)
+@section('title', 'เลือกรายการพิมพ์ Label - ' . $product->full_name)
 
 @section('content_header')
     <div class="row">
@@ -11,7 +11,7 @@
             <ol class="breadcrumb float-sm-right">
                 <li class="breadcrumb-item"><a href="{{ route('admin.dashboard') }}">หน้าหลัก</a></li>
                 <li class="breadcrumb-item"><a href="{{ route('admin.barcode-labels.index') }}">พิมพ์ Label Barcode</a></li>
-                <li class="breadcrumb-item active">{{ $product->name }}</li>
+                <li class="breadcrumb-item active">{{ $product->full_name }}</li>
             </ol>
         </div>
     </div>
@@ -44,7 +44,7 @@
                         <div class="col-md-10">
                             <div class="row">
                                 <div class="col-md-6">
-                                    <h4>{{ $product->name }}</h4>
+                                    <h4>{{ $product->full_name }}</h4>
                                     <div class="mb-2">
                                         <strong>รหัสสินค้า:</strong> {{ $product->sku }}
                                     </div>
@@ -95,6 +95,9 @@
                             <i class="fas fa-list"></i> รายการสินค้าแต่ละชิ้น
                         </h3>
                         <div class="card-tools">
+                            <button type="button" class="btn btn-sm btn-outline-success" id="selectUnprinted" title="เลือกเฉพาะที่ยังไม่พิมพ์">
+                                <i class="fas fa-filter"></i> ยังไม่พิมพ์
+                            </button>
                             <button type="button" class="btn btn-sm btn-primary" id="selectAll">
                                 <i class="fas fa-check-square"></i> เลือกทั้งหมด
                             </button>
@@ -119,19 +122,21 @@
                                             <th>Serial Number</th>
                                             <th>คลัง</th>
                                             <th>สถานะ</th>
+                                            <th>สถานะพิมพ์</th>
                                             <th>ตำแหน่ง</th>
                                             <th>วันที่เข้า</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         @foreach($stockItems as $stockItem)
-                                            <tr>
+                                            <tr class="{{ $stockItem->label_printed_at ? 'table-light' : '' }}">
                                                 <td>
                                                     <div class="form-check">
                                                         <input type="checkbox" 
                                                                class="form-check-input stock-item-checkbox" 
                                                                name="stock_item_ids[]" 
                                                                value="{{ $stockItem->id }}"
+                                                               data-printed="{{ $stockItem->label_printed_at ? '1' : '0' }}"
                                                                id="item_{{ $stockItem->id }}">
                                                         <label class="form-check-label" for="item_{{ $stockItem->id }}"></label>
                                                     </div>
@@ -149,6 +154,23 @@
                                                     <span class="badge badge-{{ $stockItem->status_color }}">
                                                         {{ $stockItem->status_text }}
                                                     </span>
+                                                </td>
+                                                <td>
+                                                    @if($stockItem->label_printed_at)
+                                                        <span class="badge badge-success" title="พิมพ์แล้ว {{ $stockItem->label_print_count }} ครั้ง&#10;ล่าสุด: {{ $stockItem->label_printed_at->format('d/m/Y H:i') }}">
+                                                            <i class="fas fa-check"></i> พิมพ์แล้ว ({{ $stockItem->label_print_count }})
+                                                        </span>
+                                                        @php $lastLog = $stockItem->printLogs->first(); @endphp
+                                                        @if($lastLog && !$lastLog->verified)
+                                                            <br><span class="badge badge-warning mt-1"><i class="fas fa-exclamation-triangle"></i> ยังไม่ยืนยัน</span>
+                                                        @elseif($lastLog && $lastLog->verified)
+                                                            <br><span class="badge badge-info mt-1"><i class="fas fa-check-double"></i> ยืนยันแล้ว</span>
+                                                        @endif
+                                                    @else
+                                                        <span class="badge badge-secondary">
+                                                            <i class="fas fa-times"></i> ยังไม่พิมพ์
+                                                        </span>
+                                                    @endif
                                                 </td>
                                                 <td>{{ $stockItem->location_code ?? '-' }}</td>
                                                 <td>{{ $stockItem->received_date ? $stockItem->received_date->format('d/m/Y') : '-' }}</td>
@@ -206,11 +228,20 @@
 
                         <div class="form-group">
                             <label>สรุปการพิมพ์:</label>
-                            <div class="alert alert-info">
+                            <div class="alert alert-info mb-2">
                                 <div>รายการที่เลือก: <span id="selectedCount">0</span></div>
+                                <div class="text-warning" id="reprintWarning" style="display:none;">
+                                    <i class="fas fa-exclamation-triangle"></i> พิมพ์ซ้ำ: <span id="reprintCount">0</span> รายการ
+                                </div>
                                 <div>จำนวนสำเนา: <span id="totalCopies">0</span></div>
                                 <div><strong>รวม Label: <span id="totalLabels">0</span> ใบ</strong></div>
                             </div>
+                        </div>
+
+                        <!-- เหตุผลพิมพ์ซ้ำ (แสดงเมื่อมีรายการพิมพ์ซ้ำ) -->
+                        <div class="form-group" id="reprintReasonGroup" style="display:none;">
+                            <label for="reprint_reason"><i class="fas fa-comment"></i> เหตุผลที่พิมพ์ซ้ำ:</label>
+                            <textarea class="form-control" name="reprint_reason" id="reprint_reason" rows="2" placeholder="เช่น สติกเกอร์เสีย, หลุด, อ่านไม่ออก"></textarea>
                         </div>
 
                         <div class="form-group mb-0">
@@ -234,7 +265,7 @@
                                 <i class="fas fa-barcode fa-2x"></i>
                             </div>
                             <div class="text-sm">
-                                <div><strong>{{ $product->name }}</strong></div>
+                                <div><strong>{{ $product->full_name }}</strong></div>
                                 <div>{{ $product->sku }}</div>
                                 <div><small>Barcode จะแสดงที่นี่</small></div>
                             </div>
@@ -274,6 +305,15 @@
                 updateSummary();
             });
 
+            // เลือกเฉพาะที่ยังไม่พิมพ์
+            $('#selectUnprinted').click(function() {
+                $('.stock-item-checkbox').each(function() {
+                    $(this).prop('checked', $(this).data('printed') == '0');
+                });
+                updateCheckAllState();
+                updateSummary();
+            });
+
             $('#clearAll').click(function() {
                 $('.stock-item-checkbox').prop('checked', false);
                 $('#checkAll').prop('checked', false);
@@ -304,15 +344,31 @@
                 const copiesPerItem = parseInt($('#copies_per_item').val());
                 const totalLabels = selectedCount * copiesPerItem;
 
+                // นับรายการที่เคยพิมพ์แล้ว
+                let reprintCount = 0;
+                $('.stock-item-checkbox:checked').each(function() {
+                    if ($(this).data('printed') == '1') reprintCount++;
+                });
+
                 $('#selectedCount').text(selectedCount);
                 $('#totalCopies').text(copiesPerItem);
                 $('#totalLabels').text(totalLabels);
+
+                // แสดง/ซ่อน warning พิมพ์ซ้ำ
+                if (reprintCount > 0) {
+                    $('#reprintCount').text(reprintCount);
+                    $('#reprintWarning').show();
+                    $('#reprintReasonGroup').show();
+                } else {
+                    $('#reprintWarning').hide();
+                    $('#reprintReasonGroup').hide();
+                }
 
                 // Enable/disable print button
                 $('#printBtn').prop('disabled', selectedCount === 0);
             }
 
-            // Form validation
+            // Form submission with reprint confirmation
             $('#printForm').on('submit', function(e) {
                 if ($('.stock-item-checkbox:checked').length === 0) {
                     e.preventDefault();
@@ -325,7 +381,63 @@
                     return false;
                 }
 
-                // แสดง loading
+                // เช็คว่ามีรายการพิมพ์ซ้ำไหม
+                let reprintCount = 0;
+                let reprintItems = [];
+                $('.stock-item-checkbox:checked').each(function() {
+                    if ($(this).data('printed') == '1') {
+                        reprintCount++;
+                        reprintItems.push($(this).closest('tr').find('code').text());
+                    }
+                });
+
+                if (reprintCount > 0) {
+                    e.preventDefault();
+                    const reason = $('#reprint_reason').val();
+
+                    let html = `<div class="text-left">`;
+                    html += `<p class="text-danger"><strong><i class="fas fa-exclamation-triangle"></i> มี ${reprintCount} รายการที่เคยพิมพ์แล้ว:</strong></p>`;
+                    html += `<ul class="text-sm">`;
+                    reprintItems.forEach(item => {
+                        html += `<li><code>${item}</code></li>`;
+                    });
+                    html += `</ul>`;
+                    if (!reason) {
+                        html += `<p class="text-warning"><i class="fas fa-info-circle"></i> กรุณาระบุเหตุผลที่พิมพ์ซ้ำในช่องด้านซ้ายก่อนพิมพ์</p>`;
+                    }
+                    html += `</div>`;
+
+                    if (!reason) {
+                        Swal.fire({
+                            title: 'กรุณาระบุเหตุผล',
+                            html: html,
+                            icon: 'warning',
+                            confirmButtonText: 'ตกลง',
+                        });
+                        $('#reprint_reason').focus();
+                        return false;
+                    }
+
+                    Swal.fire({
+                        title: 'ยืนยันการพิมพ์ซ้ำ?',
+                        html: html + `<p><strong>เหตุผล:</strong> ${reason}</p>`,
+                        icon: 'warning',
+                        showCancelButton: true,
+                        confirmButtonColor: '#28a745',
+                        cancelButtonColor: '#6c757d',
+                        confirmButtonText: '<i class="fas fa-print"></i> ยืนยันพิมพ์',
+                        cancelButtonText: 'ยกเลิก',
+                    }).then((result) => {
+                        if (result.isConfirmed) {
+                            $('#printBtn').html('<i class="fas fa-spinner fa-spin"></i> กำลังเตรียมการพิมพ์...');
+                            $('#printBtn').prop('disabled', true);
+                            $('#printForm')[0].submit();
+                        }
+                    });
+                    return false;
+                }
+
+                // กรณีพิมพ์ใหม่ทั้งหมด — ไม่ต้อง confirm
                 $('#printBtn').html('<i class="fas fa-spinner fa-spin"></i> กำลังเตรียมการพิมพ์...');
                 $('#printBtn').prop('disabled', true);
             });

@@ -266,7 +266,7 @@
                             <tr>
                                 <td>{{ $index + 1 }}</td>
                                 <td><code>{{ $item->barcode }}</code></td>
-                                <td>{{ $item->product->name ?? 'N/A' }}</td>
+                                <td>{{ $item->product->full_name ?? 'N/A' }}</td>
                                 <td>{{ $item->scanned_count }}</td>
                                 <td>{{ $item->last_scanned_at?->format('d/m/Y H:i:s') ?? '-' }}</td>
                             </tr>

@@ -6,10 +6,13 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Carbon\Carbon;
 
 class StockItem extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'product_id',
         'warehouse_id', 
@@ -28,6 +31,8 @@ class StockItem extends Model
         'grade',
         'size',
         'notes',
+        'label_printed_at',
+        'label_print_count',
         'created_by',
         'updated_by'
     ];
@@ -36,6 +41,7 @@ class StockItem extends Model
         'manufacture_date' => 'date',
         'expire_date' => 'date',
         'received_date' => 'date',
+        'label_printed_at' => 'datetime',
         'cost_price' => 'decimal:2',
         'selling_price' => 'decimal:2'
     ];
@@ -62,6 +68,22 @@ class StockItem extends Model
     public function package(): BelongsTo
     {
         return $this->belongsTo(Package::class);
+    }
+
+    /**
+     * ประวัติการพิมพ์ Label
+     */
+    public function printLogs(): HasMany
+    {
+        return $this->hasMany(BarcodePrintLog::class);
+    }
+
+    /**
+     * เคยพิมพ์ Label แล้วหรือยัง
+     */
+    public function getHasLabelPrintedAttribute(): bool
+    {
+        return !is_null($this->label_printed_at);
     }
 
     /**

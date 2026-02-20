@@ -367,7 +367,7 @@
                 <tr>
                     <td class="text-center">{{ $index + 1 }}</td>
                     <td>
-                        <strong>{{ $item->product->name }}</strong><br>
+                        <strong>{{ $item->product->full_name }}</strong><br>
                         <small style="color: #7f8c8d;">SKU: {{ $item->product->sku }}</small>
                         
                         @if($deliveryNote->status === 'completed' && $item->scanned_quantity != $item->quantity)

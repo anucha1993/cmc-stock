@@ -133,9 +133,11 @@
         <div class="card-header">
             <h3 class="card-title">รายการสินค้า</h3>
             <div class="card-tools">
+                @can('create-edit')
                 <a href="{{ route('admin.products.create') }}" class="btn btn-primary">
                     <i class="fas fa-plus"></i> เพิ่มสินค้าใหม่
                 </a>
+                @endcan
             </div>
         </div>
         
@@ -170,7 +172,7 @@
                                 </td>
                                 <td>
                                     <div>
-                                        <strong>{{ $product->name }}</strong>
+                                        <strong>{{ $product->full_name }}</strong>
                                         <br><small class="text-muted">SKU: {{ $product->sku }}</small>
                                         @if($product->description)
                                             <br><small class="text-muted">{{ Str::limit($product->description, 50) }}</small>
@@ -242,15 +244,16 @@
                                         <a href="{{ route('admin.products.show', $product) }}" class="btn btn-info btn-sm" title="ดูรายละเอียด">
                                             <i class="fas fa-eye"></i>
                                         </a>
+                                        @can('create-edit')
                                         <a href="{{ route('admin.products.edit', $product) }}" class="btn btn-warning btn-sm" title="แก้ไข">
                                             <i class="fas fa-edit"></i>
                                         </a>
-                                        <button type="button" class="btn btn-success btn-sm" onclick="createStockAdjustmentRequest({{ $product->id }}, '{{ $product->name }}', {{ $product->total_stock }}, '{{ $product->unit }}')" title="สร้างคำขอปรับปรุงสต็อก">
-                                            <i class="fas fa-boxes"></i>
-                                        </button>
-                                        <button type="button" class="btn btn-danger btn-sm" onclick="deleteProduct({{ $product->id }}, '{{ $product->name }}')" title="ลบ">
+                                        @endcan
+                                        @can('delete')
+                                        <button type="button" class="btn btn-danger btn-sm" onclick="deleteProduct({{ $product->id }}, '{{ $product->full_name }}')" title="ลบ">
                                             <i class="fas fa-trash"></i>
                                         </button>
+                                        @endcan
                                     </div>
                                 </td>
                             </tr>
@@ -267,9 +270,11 @@
                     <i class="fas fa-box-open fa-3x text-muted mb-3"></i>
                     <h5 class="text-muted">ไม่มีข้อมูลสินค้า</h5>
                     <p class="text-muted">เริ่มต้นด้วยการเพิ่มสินค้าใหม่</p>
+                    @can('create-edit')
                     <a href="{{ route('admin.products.create') }}" class="btn btn-primary">
                         <i class="fas fa-plus"></i> เพิ่มสินค้าใหม่
                     </a>
+                    @endcan
                 </div>
             @endif
         </div>

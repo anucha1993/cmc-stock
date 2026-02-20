@@ -47,7 +47,7 @@
                                         @foreach($products as $product)
                                             <option value="{{ $product->id }}" 
                                                 {{ (old('product_id', $selectedProduct->id ?? null) == $product->id) ? 'selected' : '' }}>
-                                                {{ $product->name }} ({{ $product->code }})
+                                                {{ $product->full_name }} ({{ $product->code }})
                                             </option>
                                         @endforeach
                                     </select>

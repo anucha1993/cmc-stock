@@ -70,9 +70,11 @@
         <div class="card-header">
             <h3 class="card-title">กรองข้อมูล</h3>
             <div class="card-tools">
+                @can('stock-operations')
                 <a href="{{ route('admin.stock-adjustments.create') }}" class="btn btn-primary btn-sm">
                     <i class="fas fa-plus"></i> สร้างคำขอใหม่
                 </a>
+                @endcan
             </div>
         </div>
         <div class="card-body">
@@ -194,6 +196,7 @@
                                        class="btn btn-info btn-sm" title="ดูรายละเอียด">
                                         <i class="fas fa-eye"></i>
                                     </a>
+                                    @can('approve')
                                     @if($request->status === 'pending')
                                         <button type="button" class="btn btn-success btn-sm" 
                                                 onclick="approveRequest({{ $request->id }})" title="อนุมัติ">
@@ -209,6 +212,7 @@
                                             <i class="fas fa-cog"></i>
                                         </button>
                                     @endif
+                                    @endcan
                                 </div>
                             </td>
                         </tr>

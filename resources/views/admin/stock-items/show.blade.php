@@ -28,8 +28,8 @@
                         <a href="{{ route('admin.stock-items.edit', $stockItem) }}" class="btn btn-warning btn-sm">
                             <i class="fas fa-edit"></i> แก้ไข
                         </a>
-                        <button type="button" class="btn btn-success btn-sm" onclick="generateQR({{ $stockItem->id }})">
-                            <i class="fas fa-qrcode"></i> QR Code
+                        <button type="button" class="btn btn-success btn-sm" onclick="generateBarcode({{ $stockItem->id }})">
+                            <i class="fas fa-barcode"></i> Barcode
                         </button>
                     </div>
                 </div>
@@ -261,18 +261,18 @@
                 </div>
             </div>
 
-            <!-- QR Code -->
+            <!-- Barcode -->
             <div class="card">
                 <div class="card-header">
-                    <h3 class="card-title">QR Code</h3>
+                    <h3 class="card-title">Barcode</h3>
                 </div>
                 <div class="card-body text-center">
-                    <div id="qrcode"></div>
+                    <svg id="barcode-svg"></svg>
                     <p class="mt-2">{{ $stockItem->barcode }}</p>
-                    <button type="button" class="btn btn-primary btn-sm" onclick="generateQR({{ $stockItem->id }})">
-                        <i class="fas fa-qrcode"></i> สร้าง QR Code
+                    <button type="button" class="btn btn-primary btn-sm" onclick="generateBarcode({{ $stockItem->id }})">
+                        <i class="fas fa-barcode"></i> สร้าง Barcode
                     </button>
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="printQR()">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="printBarcode()">
                         <i class="fas fa-print"></i> พิมพ์
                     </button>
                 </div>
@@ -286,28 +286,28 @@
 @stop
 
 @section('js')
-    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.6/dist/JsBarcode.all.min.js"></script>
     <script>
-        function generateQR(stockItemId) {
-            fetch(`/admin/stock-items/${stockItemId}/generate-qr`)
+        function generateBarcode(stockItemId) {
+            fetch(`/admin/stock-items/${stockItemId}/generate-barcode`)
                 .then(response => response.json())
                 .then(data => {
                     if (data.success) {
-                        // Clear previous QR code
-                        document.getElementById('qrcode').innerHTML = '';
-                        
-                        // Generate new QR code
-                        QRCode.toCanvas(document.getElementById('qrcode'), data.data, {
-                            width: 150,
-                            height: 150
+                        JsBarcode('#barcode-svg', data.barcode, {
+                            format: 'CODE128',
+                            width: 2,
+                            height: 80,
+                            displayValue: true,
+                            fontSize: 16,
+                            margin: 10
                         });
                     } else {
-                        alert('เกิดข้อผิดพลาดในการสร้าง QR Code');
+                        alert('เกิดข้อผิดพลาดในการสร้าง Barcode');
                     }
                 })
                 .catch(error => {
                     console.error('Error:', error);
-                    alert('เกิดข้อผิดพลาดในการสร้าง QR Code');
+                    alert('เกิดข้อผิดพลาดในการสร้าง Barcode');
                 });
         }
 
@@ -371,28 +371,28 @@
             });
         }
 
-        function printQR() {
-            const qrCanvas = document.querySelector('#qrcode canvas');
+        function printBarcode() {
+            const svgElement = document.getElementById('barcode-svg');
             const barcode = '{{ $stockItem->barcode }}';
+            const productName = '{{ $stockItem->product->name }}';
             
-            if (qrCanvas) {
-                const dataURL = qrCanvas.toDataURL();
+            if (svgElement) {
+                const svgData = new XMLSerializer().serializeToString(svgElement);
                 const printWindow = window.open('', '_blank');
                 printWindow.document.write(`
                     <html>
                         <head>
-                            <title>QR Code - ${barcode}</title>
+                            <title>Barcode - ${barcode}</title>
                             <style>
                                 body { text-align: center; margin: 20px; font-family: Arial, sans-serif; }
-                                img { margin: 20px 0; }
+                                svg { margin: 20px 0; }
                                 .barcode { font-family: monospace; font-size: 16px; font-weight: bold; }
                                 .product { font-size: 14px; margin-top: 10px; }
                             </style>
                         </head>
                         <body>
-                            <img src="${dataURL}" alt="QR Code">
-                            <div class="barcode">${barcode}</div>
-                            <div class="product">{{ $stockItem->product->name }}</div>
+                            ${svgData}
+                            <div class="product">${productName}</div>
                             <script>window.print(); window.close();</script>
                         </body>
                     </html>
@@ -400,9 +400,9 @@
             }
         }
 
-        // สร้าง QR Code เมื่อโหลดหน้า
+        // สร้าง Barcode เมื่อโหลดหน้า
         document.addEventListener('DOMContentLoaded', function() {
-            generateQR({{ $stockItem->id }});
+            generateBarcode({{ $stockItem->id }});
         });
     </script>
 @stop

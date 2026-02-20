@@ -21,9 +21,11 @@
         <div class="card-header">
             <h3 class="card-title">รายการคลังสินค้า</h3>
             <div class="card-tools">
+                @can('manage-warehouses')
                 <a href="{{ route('admin.warehouses.create') }}" class="btn btn-primary btn-sm">
                     <i class="fas fa-plus"></i> เพิ่มคลังสินค้า
                 </a>
+                @endcan
             </div>
         </div>
         <div class="card-body">
@@ -90,16 +92,20 @@
                                            class="btn btn-success" title="จัดการสต็อก">
                                             <i class="fas fa-boxes"></i>
                                         </a>
+                                        @can('manage-warehouses')
                                         <a href="{{ route('admin.warehouses.edit', $warehouse) }}" 
                                            class="btn btn-warning" title="แก้ไข">
                                             <i class="fas fa-edit"></i>
                                         </a>
+                                        @endcan
+                                        @can('delete')
                                         @if(!$warehouse->is_main)
                                             <button type="button" class="btn btn-danger" 
                                                     onclick="confirmDelete({{ $warehouse->id }})" title="ลบ">
                                                 <i class="fas fa-trash"></i>
                                             </button>
                                         @endif
+                                        @endcan
                                     </div>
                                 </td>
                             </tr>

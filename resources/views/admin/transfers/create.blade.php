@@ -84,7 +84,7 @@
                                                     {{ old('product_id') == $product->id ? 'selected' : '' }}
                                                     data-sku="{{ $product->sku }}"
                                                     data-category="{{ $product->category->name ?? '' }}">
-                                                {{ $product->name }} ({{ $product->sku }})
+                                                {{ $product->full_name }} ({{ $product->sku }})
                                             </option>
                                         @endforeach
                                     </select>

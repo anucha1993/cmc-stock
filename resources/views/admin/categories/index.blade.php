@@ -107,9 +107,11 @@
         <div class="card-header">
             <h3 class="card-title">รายการหมวดหมู่สินค้า</h3>
             <div class="card-tools">
+                @can('manage-master-data')
                 <a href="{{ route('admin.categories.create') }}" class="btn btn-primary btn-sm">
                     <i class="fas fa-plus"></i> เพิ่มหมวดหมู่
                 </a>
+                @endcan
             </div>
         </div>
         <div class="card-body">
@@ -154,14 +156,18 @@
                                            class="btn btn-info" title="ดูรายละเอียด">
                                             <i class="fas fa-eye"></i>
                                         </a>
+                                        @can('manage-master-data')
                                         <a href="{{ route('admin.categories.edit', $category) }}" 
                                            class="btn btn-warning" title="แก้ไข">
                                             <i class="fas fa-edit"></i>
                                         </a>
+                                        @endcan
+                                        @can('delete')
                                         <button type="button" class="btn btn-danger" 
                                                 onclick="confirmDelete({{ $category->id }})" title="ลบ">
                                             <i class="fas fa-trash"></i>
                                         </button>
+                                        @endcan
                                     </div>
                                 </td>
                             </tr>

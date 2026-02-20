@@ -124,6 +124,7 @@
                             คำขอนี้รอการอนุมัติ
                         </p>
 
+                        @can('approve')
                         <!-- Approve Form -->
                         <form action="{{ route('admin.stock-adjustments.approve', $stockAdjustment) }}" method="POST" class="mb-3">
                             @csrf
@@ -171,6 +172,7 @@
                                 <i class="fas fa-times"></i> ปฏิเสธ
                             </button>
                         </form>
+                        @endcan
                     </div>
                 </div>
             @endif
@@ -190,12 +192,14 @@
                             <strong>วันที่อนุมัติ:</strong> {{ $stockAdjustment->approved_at->format('d/m/Y H:i') }}
                         </p>
 
+                        @can('approve')
                         <form action="{{ route('admin.stock-adjustments.process', $stockAdjustment) }}" method="POST">
                             @csrf
                             <button type="submit" class="btn btn-primary btn-block" onclick="return confirm('ต้องการดำเนินการปรับปรุงสต็อกใช่หรือไม่?')">
                                 <i class="fas fa-cogs"></i> ดำเนินการปรับปรุงสต็อก
                             </button>
                         </form>
+                        @endcan
                     </div>
                 </div>
             @endif
@@ -327,9 +331,12 @@
                         </div>
                         <div class="col-md-6 text-right">
                             @if($stockAdjustment->status === 'pending')
+                                @can('create-edit')
                                 <a href="{{ route('admin.stock-adjustments.edit', $stockAdjustment) }}" class="btn btn-warning">
                                     <i class="fas fa-edit"></i> แก้ไข
                                 </a>
+                                @endcan
+                                @can('delete')
                                 <form action="{{ route('admin.stock-adjustments.destroy', $stockAdjustment) }}" 
                                       method="POST" 
                                       class="d-inline"
@@ -340,6 +347,7 @@
                                         <i class="fas fa-trash"></i> ลบ
                                     </button>
                                 </form>
+                                @endcan
                             @endif
                         </div>
                     </div>

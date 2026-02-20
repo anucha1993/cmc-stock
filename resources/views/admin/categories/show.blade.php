@@ -164,13 +164,13 @@
                         </span>
                         <div class="info-box-content">
                             <span class="info-box-text">สินค้าใกล้หมด</span>
-                            <span class="info-box-number">{{ $category->products->where('stock_quantity', '<=', 'min_stock_quantity')->count() }}</span>
+                            <span class="info-box-number">{{ $category->products->filter(fn($p) => $p->total_stock <= $p->min_stock && $p->total_stock > 0)->count() }}</span>
                         </div>
                     </div>
 
                     @php
                         $totalValue = $category->products->sum(function($product) {
-                            return $product->cost_price * $product->stock_quantity;
+                            return $product->cost * $product->total_stock;
                         });
                     @endphp
                     <div class="info-box">
@@ -206,9 +206,9 @@
                         <table class="table table-hover text-nowrap">
                             <thead>
                                 <tr>
-                                    <th>รหัสสินค้า</th>
+                                    <th>SKU</th>
                                     <th>ชื่อสินค้า</th>
-                                    <th>ราคาซื้อ</th>
+                                    <th>ราคาทุน</th>
                                     <th>ราคาขาย</th>
                                     <th>จำนวนในสต็อก</th>
                                     <th>สถานะ</th>
@@ -219,18 +219,18 @@
                                 @foreach($category->products->take(10) as $product)
                                     <tr>
                                         <td>
-                                            <code>{{ $product->code }}</code>
+                                            <code>{{ $product->sku }}</code>
                                         </td>
-                                        <td>{{ $product->name }}</td>
-                                        <td>{{ number_format($product->cost_price, 2) }}</td>
-                                        <td>{{ number_format($product->selling_price, 2) }}</td>
+                                        <td>{{ $product->full_name }}</td>
+                                        <td>{{ number_format($product->cost, 2) }}</td>
+                                        <td>{{ number_format($product->price, 2) }}</td>
                                         <td>
-                                            @if($product->stock_quantity <= $product->min_stock_quantity)
-                                                <span class="badge badge-danger">{{ $product->stock_quantity }}</span>
-                                            @elseif($product->stock_quantity <= $product->min_stock_quantity * 2)
-                                                <span class="badge badge-warning">{{ $product->stock_quantity }}</span>
+                                            @if($product->total_stock <= $product->min_stock)
+                                                <span class="badge badge-danger">{{ $product->total_stock }}</span>
+                                            @elseif($product->total_stock <= $product->min_stock * 2)
+                                                <span class="badge badge-warning">{{ $product->total_stock }}</span>
                                             @else
-                                                <span class="badge badge-success">{{ $product->stock_quantity }}</span>
+                                                <span class="badge badge-success">{{ $product->total_stock }}</span>
                                             @endif
                                         </td>
                                         <td>
@@ -239,11 +239,20 @@
                                             </span>
                                         </td>
                                         <td>
-                                            @can('products.view')
-                                                <a href="{{ route('admin.products.show', $product) }}" class="btn btn-sm btn-info">
+                                            <div class="btn-group btn-group-sm" role="group">
+                                                <a href="{{ route('admin.products.show', $product) }}" class="btn btn-info" title="ดูรายละเอียด">
                                                     <i class="fas fa-eye"></i>
                                                 </a>
-                                            @endcan
+                                                <a href="{{ route('admin.products.edit', $product) }}" class="btn btn-warning" title="แก้ไข">
+                                                    <i class="fas fa-edit"></i>
+                                                </a>
+                                                <a href="{{ route('admin.stock-items.index', ['product_id' => $product->id]) }}" class="btn btn-success" title="ดูสต็อก">
+                                                    <i class="fas fa-boxes"></i>
+                                                </a>
+                                                <a href="{{ route('admin.barcode-labels.show', $product) }}" class="btn btn-secondary" title="พิมพ์บาร์โค้ด">
+                                                    <i class="fas fa-barcode"></i>
+                                                </a>
+                                            </div>
                                         </td>
                                     </tr>
                                 @endforeach

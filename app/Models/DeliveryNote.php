@@ -6,11 +6,16 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class DeliveryNote extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'delivery_number',
+        'slug',
         'sales_order_number',
         'quotation_number',
         'customer_name',
@@ -25,14 +30,17 @@ class DeliveryNote extends Model
         'scanned_at',
         'approved_by',
         'approved_at',
-        'discrepancy_notes'
+        'discrepancy_notes',
+        'share_token',
+        'share_token_expires_at',
     ];
 
     protected $casts = [
         'delivery_date' => 'date',
         'confirmed_at' => 'datetime',
         'scanned_at' => 'datetime',
-        'approved_at' => 'datetime'
+        'approved_at' => 'datetime',
+        'share_token_expires_at' => 'datetime',
     ];
 
     /**
@@ -74,6 +82,10 @@ class DeliveryNote extends Model
             if (empty($deliveryNote->delivery_number)) {
                 $deliveryNote->delivery_number = self::generateDeliveryNumber();
             }
+            // Auto-generate slug จาก delivery_number
+            if (empty($deliveryNote->slug)) {
+                $deliveryNote->slug = self::generateSlug($deliveryNote->delivery_number);
+            }
         });
     }
 
@@ -98,6 +110,65 @@ class DeliveryNote extends Model
         }
 
         return $prefix . $date . str_pad($newNumber, 4, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * สร้าง slug จากเลขที่ใบตัดสต็อก
+     */
+    public static function generateSlug(?string $deliveryNumber = null): string
+    {
+        $base = $deliveryNumber
+            ? Str::slug($deliveryNumber)
+            : Str::random(8);
+
+        // เพิ่ม random suffix กันซ้ำ
+        $slug = $base . '-' . Str::lower(Str::random(6));
+
+        // วนจนกว่าจะไม่ซ้ำ
+        while (self::withTrashed()->where('slug', $slug)->exists()) {
+            $slug = $base . '-' . Str::lower(Str::random(6));
+        }
+
+        return $slug;
+    }
+
+    /**
+     * สร้าง Share Token (หมดอายุ 3 ชม.)
+     */
+    public function generateShareToken(): string
+    {
+        $token = hash('sha256', Str::random(40) . $this->id . now()->timestamp);
+
+        $this->update([
+            'share_token' => $token,
+            'share_token_expires_at' => now()->addHours(3),
+        ]);
+
+        return $token;
+    }
+
+    /**
+     * ตรวจสอบว่า share token ยังใช้ได้อยู่
+     */
+    public function isShareTokenValid(?string $token): bool
+    {
+        if (!$token || !$this->share_token) {
+            return false;
+        }
+
+        return hash_equals($this->share_token, $token)
+            && $this->share_token_expires_at
+            && $this->share_token_expires_at->isFuture();
+    }
+
+    /**
+     * สร้าง URL สำหรับแชร์
+     */
+    public function getShareUrl(): string
+    {
+        $token = $this->generateShareToken();
+
+        return url("/dn/{$this->slug}?token={$token}");
     }
 
     /**

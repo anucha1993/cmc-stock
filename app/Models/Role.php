@@ -23,9 +23,12 @@ class Role extends Model
     ];
 
     // Role levels constants
-    const MASTER_ADMIN_LEVEL = 1;
-    const ADMIN_LEVEL = 2;
-    const MEMBER_LEVEL = 3;
+    const MASTER_ADMIN_LEVEL = 1;  // ผู้ดูแลระบบ
+    const ADMIN_LEVEL = 2;         // ผู้จัดการคลัง
+    const SUPERVISOR_LEVEL = 3;    // หัวหน้างาน
+    const STAFF_LEVEL = 4;         // พนักงานคลัง
+    const VIEWER_LEVEL = 5;        // ผู้ดูข้อมูล
+    const DRIVER_LEVEL = 6;        // คนรถ (สแกนบาร์โค้ดตอนขนของ)
 
     /**
      * Get the users that belong to the role.
@@ -52,11 +55,35 @@ class Role extends Model
     }
 
     /**
-     * Check if this role is Member
+     * Check if this role is Supervisor
      */
-    public function isMember()
+    public function isSupervisor()
     {
-        return $this->level === self::MEMBER_LEVEL;
+        return $this->level === self::SUPERVISOR_LEVEL;
+    }
+
+    /**
+     * Check if this role is Staff
+     */
+    public function isStaff()
+    {
+        return $this->level === self::STAFF_LEVEL;
+    }
+
+    /**
+     * Check if this role is Viewer
+     */
+    public function isViewer()
+    {
+        return $this->level === self::VIEWER_LEVEL;
+    }
+
+    /**
+     * Check if this role is Driver
+     */
+    public function isDriver()
+    {
+        return $this->level === self::DRIVER_LEVEL;
     }
 
     /**
@@ -64,15 +91,14 @@ class Role extends Model
      */
     public function getLevelNameAttribute()
     {
-        switch ($this->level) {
-            case self::MASTER_ADMIN_LEVEL:
-                return 'Master Admin';
-            case self::ADMIN_LEVEL:
-                return 'Admin';
-            case self::MEMBER_LEVEL:
-                return 'Member';
-            default:
-                return 'Unknown';
-        }
+        return match ($this->level) {
+            self::MASTER_ADMIN_LEVEL => 'Master Admin',
+            self::ADMIN_LEVEL       => 'ผู้จัดการคลัง',
+            self::SUPERVISOR_LEVEL  => 'หัวหน้างาน',
+            self::STAFF_LEVEL       => 'พนักงานคลัง',
+            self::VIEWER_LEVEL      => 'ผู้ดูข้อมูล',
+            self::DRIVER_LEVEL      => 'คนรถ',
+            default                 => 'Unknown',
+        };
     }
 }

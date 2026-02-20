@@ -139,7 +139,7 @@
                                 <span class="time"><i class="fas fa-clock"></i> {{ $deliveryNote->scanned_at->format('d/m/Y H:i') }}</span>
                                 <h3 class="timeline-header">สแกน Barcode</h3>
                                 <div class="timeline-body">
-                                    โดย {{ $deliveryNote->scanner->name }}
+                                    โดย {{ $deliveryNote->scanner->name ?? 'สแกนผ่านลิงก์สาธารณะ' }}
                                     <br>สแกนแล้ว: <strong>{{ $deliveryNote->total_scanned }} / {{ $deliveryNote->total_items }}</strong> ชิ้น
                                 </div>
                             </div>
@@ -154,7 +154,7 @@
                                 <span class="time"><i class="fas fa-clock"></i> {{ $deliveryNote->approved_at->format('d/m/Y H:i') }}</span>
                                 <h3 class="timeline-header">อนุมัติและตัดสต็อก</h3>
                                 <div class="timeline-body">
-                                    โดย {{ $deliveryNote->approver->name }}
+                                    โดย {{ $deliveryNote->approver->name ?? '-' }}
                                     @if($deliveryNote->discrepancy_notes)
                                         <br><span class="text-warning"><i class="fas fa-exclamation-triangle"></i> มีความไม่ตรงกัน</span>
                                     @endif
@@ -196,7 +196,7 @@
                         <tr>
                             <td>{{ $index + 1 }}</td>
                             <td>
-                                <strong>{{ $item->product->name }}</strong>
+                                <strong>{{ $item->product->full_name }}</strong>
                                 <br><small class="text-muted">SKU: {{ $item->product->sku }}</small>
                             </td>
                             <td class="text-center">
@@ -244,9 +244,9 @@
                     </tbody>
                     <tfoot class="bg-light">
                         <tr>
-                            <td colspan="6" class="text-right"><strong>ยอดรวมทั้งหมด:</strong></td>
-                            <td class="text-right"><strong>{{ number_format($deliveryNote->total_amount, 2) }}</strong></td>
-                            <td></td>
+                            <td colspan="4" class="text-right"><strong>รวมทั้งหมด:</strong></td>
+                            <td class="text-center"><strong>{{ $deliveryNote->items->count() }} รายการ</strong></td>
+                            <td colspan="1"></td>
                         </tr>
                     </tfoot>
                 </table>
@@ -360,6 +360,7 @@
                         </div>
                     @endif
                     
+                    @can('approve')
                     <form action="{{ route('admin.delivery-notes.approve', $deliveryNote->id) }}" method="POST" style="display: inline-block;">
                         @csrf
                         @if($hasOverScanned)
@@ -373,25 +374,23 @@
                             </button>
                         @endif
                     </form>
+                    @endcan
                 @endif
                 
-                <a href="{{ route('admin.delivery-notes.scan', $deliveryNote->id) }}" class="btn btn-primary">
-                    <i class="fas fa-barcode"></i> {{ $hasScanned ? 'สแกนเพิ่ม' : 'สแกน Barcode' }}
-                </a>
-                
                 @if($deliveryNote->status === 'pending')
+                    @can('create-edit')
                     <a href="{{ route('admin.delivery-notes.edit', $deliveryNote->id) }}" class="btn btn-warning">
                         <i class="fas fa-edit"></i> แก้ไข
                     </a>
+                    @endcan
                 @endif
             @endif
 
-            @if($deliveryNote->status === 'scanned')
-                @if(!$hasScanned)
-                    <a href="{{ route('admin.delivery-notes.scan', $deliveryNote->id) }}" class="btn btn-primary">
-                        <i class="fas fa-barcode"></i> สแกนเพิ่ม
-                    </a>
-                @endif
+            @if($deliveryNote->status !== 'completed')
+            <button type="button" class="btn btn-outline-primary" id="btn-copy-share-link"
+                    data-url="{{ route('admin.delivery-notes.share-link', $deliveryNote->id) }}">
+                <i class="fas fa-link"></i> Copy URL สแกน
+            </button>
             @endif
 
             <a href="{{ route('admin.delivery-notes.print', $deliveryNote->id) }}" class="btn btn-secondary" target="_blank">
@@ -403,4 +402,50 @@
             </a>
         </div>
     </div>
+@stop
+
+@section('js')
+<script>
+// Copy Share Link
+$('#btn-copy-share-link').on('click', function() {
+    const btn = $(this);
+    const originalHtml = btn.html();
+    btn.prop('disabled', true).html('<i class="fas fa-spinner fa-spin"></i> กำลังสร้างลิงก์...');
+
+    $.ajax({
+        url: btn.data('url'),
+        method: 'POST',
+        data: { _token: '{{ csrf_token() }}' },
+        success: function(res) {
+            if (res.success) {
+                // Copy to clipboard
+                navigator.clipboard.writeText(res.url).then(function() {
+                    btn.html('<i class="fas fa-check text-success"></i> คัดลอกแล้ว!');
+                    Swal.fire({
+                        icon: 'success',
+                        title: 'คัดลอก URL แล้ว!',
+                        html: `<div class="text-start">
+                            <p class="mb-1">ลิงก์สแกน Barcode พร้อมส่งให้คนขับ/ผู้สแกนแล้ว</p>
+                            <div class="alert alert-info py-2 px-3" style="font-size:.85rem;word-break:break-all">${res.url}</div>
+                            <p class="mb-0 text-muted" style="font-size:.85rem"><i class="fas fa-clock"></i> หมดอายุ: ${res.expires_at} (3 ชม.)</p>
+                        </div>`,
+                        confirmButtonText: 'ตกลง',
+                    });
+                }).catch(function() {
+                    // Fallback: show URL for manual copy
+                    prompt('คัดลอก URL นี้:', res.url);
+                });
+            } else {
+                Swal.fire('ไม่สำเร็จ', res.message, 'error');
+            }
+        },
+        error: function() {
+            Swal.fire('ผิดพลาด', 'ไม่สามารถสร้างลิงก์ได้', 'error');
+        },
+        complete: function() {
+            setTimeout(() => btn.prop('disabled', false).html(originalHtml), 2000);
+        }
+    });
+});
+</script>
 @stop

@@ -99,7 +99,7 @@ class User extends Authenticatable
      */
     public function isMasterAdmin()
     {
-        return $this->roles()->where('level', 1)->exists(); // Role::MASTER_ADMIN_LEVEL
+        return $this->roles()->where('level', Role::MASTER_ADMIN_LEVEL)->exists();
     }
 
     /**
@@ -107,23 +107,63 @@ class User extends Authenticatable
      */
     public function isAdmin()
     {
-        return $this->roles()->whereIn('level', [1, 2])->exists(); // Role::MASTER_ADMIN_LEVEL, Role::ADMIN_LEVEL
+        return $this->roles()->whereIn('level', [Role::MASTER_ADMIN_LEVEL, Role::ADMIN_LEVEL])->exists();
     }
 
     /**
-     * Check if user is Member
+     * Check if user is at least Supervisor (level 1-3)
+     */
+    public function isSupervisor()
+    {
+        return $this->roles()->where('level', '<=', Role::SUPERVISOR_LEVEL)->exists();
+    }
+
+    /**
+     * Check if user is at least Staff (level 1-4)
+     */
+    public function isStaff()
+    {
+        return $this->roles()->where('level', '<=', Role::STAFF_LEVEL)->exists();
+    }
+
+    /**
+     * Check if user is Viewer (level 5)
+     */
+    public function isViewer()
+    {
+        return $this->roles()->where('level', Role::VIEWER_LEVEL)->exists();
+    }
+
+    /**
+     * Check if user is Driver (level 6)
+     */
+    public function isDriver()
+    {
+        return $this->roles()->where('level', Role::DRIVER_LEVEL)->exists();
+    }
+
+    /**
+     * Check if user is Member (kept for backward compat)
      */
     public function isMember()
     {
-        return $this->roles()->where('level', 3)->exists(); // Role::MEMBER_LEVEL
+        return $this->roles()->where('level', '>=', Role::SUPERVISOR_LEVEL)->exists();
     }
 
     /**
-     * Get user's highest role level
+     * Check if user has at least the given level (lower number = higher rank)
+     */
+    public function hasMinLevel(int $level): bool
+    {
+        return $this->roles()->where('level', '<=', $level)->exists();
+    }
+
+    /**
+     * Get user's highest role level (lower = more permissions)
      */
     public function getHighestRoleLevel()
     {
-        return $this->roles()->min('level') ?? 3; // Role::MEMBER_LEVEL
+        return $this->roles()->min('level') ?? Role::DRIVER_LEVEL;
     }
 
     /**

@@ -78,7 +78,7 @@
                                             <option value="{{ $product->id }}" 
                                                     {{ old('product_id', request('product_id')) == $product->id ? 'selected' : '' }}
                                                     data-unit="{{ $product->unit }}">
-                                                {{ $product->name }} ({{ $product->sku }})
+                                                {{ $product->full_name }} ({{ $product->sku }})
                                             </option>
                                         @endforeach
                                     </select>

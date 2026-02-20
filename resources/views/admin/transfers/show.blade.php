@@ -55,7 +55,7 @@
                                 <tr>
                                     <th>สินค้า:</th>
                                     <td>
-                                        <strong>{{ $transfer->product->name }}</strong><br>
+                                        <strong>{{ $transfer->product->full_name }}</strong><br>
                                         <small class="text-muted">SKU: {{ $transfer->product->sku }}</small><br>
                                         <small class="text-muted">หมวดหมู่: {{ $transfer->product->category->name ?? '-' }}</small>
                                     </td>
@@ -255,21 +255,27 @@
                 </div>
                 <div class="card-body">
                     @if($transfer->status == 'pending')
+                        @can('approve')
                         <button type="button" class="btn btn-success btn-block mb-2" 
                                 onclick="confirmApprove()">
                             <i class="fas fa-check"></i> อนุมัติการโอน
                         </button>
+                        @endcan
+                        @can('create-edit')
                         <a href="{{ route('admin.transfers.edit', $transfer) }}" 
                            class="btn btn-warning btn-block mb-2">
                             <i class="fas fa-edit"></i> แก้ไข
                         </a>
+                        @endcan
                     @endif
 
                     @if($transfer->status == 'in_transit')
+                        @can('approve')
                         <button type="button" class="btn btn-primary btn-block mb-2" 
                                 onclick="confirmComplete()">
                             <i class="fas fa-check-double"></i> รับสินค้า
                         </button>
+                        @endcan
                     @endif
 
                     @if(in_array($transfer->status, ['pending', 'in_transit']))

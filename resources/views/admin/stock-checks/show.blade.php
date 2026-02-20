@@ -75,6 +75,7 @@
                         </a>
                         
                         @if($stats['total_scanned'] > 0)
+                            @can('approve')
                             <form action="{{ route('admin.stock-checks.complete', $stockCheck) }}" 
                                   method="POST" 
                                   style="display: inline;"
@@ -84,6 +85,7 @@
                                     <i class="fas fa-stop"></i> ปิด Session
                                 </button>
                             </form>
+                            @endcan
                         @endif
                     @endif
 
@@ -92,6 +94,7 @@
                             <i class="fas fa-chart-bar"></i> ดูรายงานเปรียบเทียบ
                         </a>
                         
+                        @can('stock-operations')
                         <form action="{{ route('admin.stock-checks.generate-adjustment', $stockCheck) }}" 
                               method="POST" 
                               style="display: inline;">
@@ -100,6 +103,7 @@
                                 <i class="fas fa-edit"></i> สร้างการปรับปรุงสต๊อก
                             </button>
                         </form>
+                        @endcan
                     @endif
                 </div>
             </div>
@@ -186,7 +190,7 @@
                                 </td>
                                 <td>
                                     @if($item->product)
-                                        <strong>{{ $item->product->name }}</strong>
+                                        <strong>{{ $item->product->full_name }}</strong>
                                         @if($item->product->sku)
                                             <br><small class="text-muted">SKU: {{ $item->product->sku }}</small>
                                         @endif

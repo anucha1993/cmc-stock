@@ -5,9 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\DeliveryNote;
 use App\Models\DeliveryNoteItem;
 use App\Models\Product;
-use App\Models\Warehouse;
 use App\Models\StockItem;
-use App\Models\InventoryTransaction;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\Auth;
@@ -56,7 +54,22 @@ class DeliveryNoteController extends Controller
      */
     public function create()
     {
-        $products = Product::active()->with('category')->get();
+        // แสดงเฉพาะสินค้าที่มี StockItem สถานะ available
+        $products = Product::active()
+            ->with('category')
+            ->whereHas('stockItems', function ($q) {
+                $q->where('status', 'available');
+            })
+            ->withCount(['stockItems as available_stock' => function ($q) {
+                $q->where('status', 'available');
+            }])
+            ->get();
+
+        // คำนวณจำนวนจอง + จำนวนขายได้จริง
+        $products->each(function ($product) {
+            $product->reserved_count = Product::getReservedStock($product->id);
+            $product->real_available = max(0, $product->available_stock - $product->reserved_count);
+        });
         
         return view('admin.delivery-notes.create', compact('products'));
     }
@@ -80,6 +93,32 @@ class DeliveryNoteController extends Controller
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator)->withInput();
+        }
+
+        // ตรวจสอบจำนวนไม่เกินสต็อกจริง (available - reserved)
+        $stockErrors = [];
+        // รวมจำนวนสินค้าเดียวกันที่อยู่หลายแถว
+        $itemsByProduct = collect($request->items)->groupBy('product_id');
+        
+        foreach ($itemsByProduct as $productId => $rows) {
+            $totalQty = $rows->sum('quantity');
+            $product = Product::find($productId);
+            if (!$product) continue;
+
+            $availableCount = $product->stockItems()->where('status', 'available')->count();
+            $reservedCount = Product::getReservedStock($productId);
+            $realAvailable = $availableCount - $reservedCount;
+
+            if ($totalQty > $realAvailable) {
+                $stockErrors[] = "{$product->full_name} — ขอ {$totalQty} ชิ้น แต่พร้อมขาย {$realAvailable} ชิ้น"
+                    . ($reservedCount > 0 ? " (จอง {$reservedCount})" : '');
+            }
+        }
+
+        if (!empty($stockErrors)) {
+            return redirect()->back()
+                ->with('error', 'จำนวนเกินสต็อกที่พร้อมขาย:<br>' . implode('<br>', $stockErrors))
+                ->withInput();
         }
 
         DB::beginTransaction();
@@ -121,15 +160,7 @@ class DeliveryNoteController extends Controller
      */
     public function show(DeliveryNote $deliveryNote)
     {
-        $deliveryNote->load(['items.product', 'creator', 'confirmer', 'scanner', 'approver']);
-        
-        // ตรวจสอบ discrepancies
-        $discrepancies = [];
-        if ($deliveryNote->status === 'scanned' || $deliveryNote->status === 'completed') {
-            $discrepancies = $deliveryNote->checkDiscrepancies();
-        }
-
-        return view('admin.delivery-notes.show', compact('deliveryNote', 'discrepancies'));
+        return redirect()->route('admin.delivery-notes.review', $deliveryNote->id);
     }
 
     /**
@@ -137,13 +168,32 @@ class DeliveryNoteController extends Controller
      */
     public function edit(DeliveryNote $deliveryNote)
     {
-        // อนุญาตให้แก้ไขเฉพาะสถานะ pending
-        if ($deliveryNote->status !== 'pending') {
+        // อนุญาตให้แก้ไขเฉพาะสถานะ pending หรือ confirmed
+        if (!in_array($deliveryNote->status, ['pending', 'confirmed'])) {
             return redirect()->route('admin.delivery-notes.show', $deliveryNote->id)
-                ->with('error', 'ไม่สามารถแก้ไขใบตัดสต็อกที่มีสถานะนอกเหนือจาก "รอยืนยัน" ได้');
+                ->with('error', 'ไม่สามารถแก้ไขใบตัดสต็อกที่สแกนหรืออนุมัติแล้วได้');
         }
 
-        $products = Product::active()->with('category')->get();
+        // แสดงเฉพาะสินค้าที่มี StockItem สถานะ available หรือสินค้าที่มีอยู่ในใบนี้แล้ว
+        $existingProductIds = $deliveryNote->items->pluck('product_id')->toArray();
+        $products = Product::active()
+            ->with('category')
+            ->where(function ($q) use ($existingProductIds) {
+                $q->whereHas('stockItems', function ($sq) {
+                    $sq->where('status', 'available');
+                })->orWhereIn('id', $existingProductIds);
+            })
+            ->withCount(['stockItems as available_stock' => function ($q) {
+                $q->where('status', 'available');
+            }])
+            ->get();
+
+        // คำนวณจำนวนจอง (exclude ใบปัจจุบัน) + จำนวนขายได้จริง
+        $products->each(function ($product) use ($deliveryNote) {
+            $product->reserved_count = Product::getReservedStock($product->id, $deliveryNote->id);
+            $product->real_available = max(0, $product->available_stock - $product->reserved_count);
+        });
+
         $deliveryNote->load(['items.product']);
 
         return view('admin.delivery-notes.edit', compact('deliveryNote', 'products'));
@@ -154,9 +204,9 @@ class DeliveryNoteController extends Controller
      */
     public function update(Request $request, DeliveryNote $deliveryNote)
     {
-        if ($deliveryNote->status !== 'pending') {
+        if (!in_array($deliveryNote->status, ['pending', 'confirmed'])) {
             return redirect()->route('admin.delivery-notes.show', $deliveryNote->id)
-                ->with('error', 'ไม่สามารถแก้ไขใบตัดสต็อกที่มีสถานะนอกเหนือจาก "รอยืนยัน" ได้');
+                ->with('error', 'ไม่สามารถแก้ไขใบตัดสต็อกที่สแกนหรืออนุมัติแล้วได้');
         }
 
         $validator = Validator::make($request->all(), [
@@ -173,6 +223,32 @@ class DeliveryNoteController extends Controller
 
         if ($validator->fails()) {
             return redirect()->back()->withErrors($validator)->withInput();
+        }
+
+        // ตรวจสอบสต็อกจริง (exclude ใบปัจจุบัน)
+        $itemsByProduct = collect($request->items)->groupBy('product_id');
+        $stockErrors = [];
+
+        foreach ($itemsByProduct as $productId => $items) {
+            $totalQty = $items->sum('quantity');
+
+            $availableCount = \App\Models\StockItem::where('product_id', $productId)
+                ->where('status', 'available')
+                ->count();
+            $reservedCount = Product::getReservedStock($productId, $deliveryNote->id);
+            $realAvailable = max(0, $availableCount - $reservedCount);
+
+            if ($totalQty > $realAvailable) {
+                $product = Product::find($productId);
+                $stockErrors[] = "สินค้า {$product->full_name} — ขอ {$totalQty} ชิ้น แต่พร้อมขาย {$realAvailable} ชิ้น" .
+                    ($reservedCount > 0 ? " (ล็อก {$reservedCount})" : '');
+            }
+        }
+
+        if (!empty($stockErrors)) {
+            return redirect()->back()
+                ->with('error', 'สต็อกไม่เพียงพอ: ' . implode(' | ', $stockErrors))
+                ->withInput();
         }
 
         DB::beginTransaction();
@@ -246,7 +322,7 @@ class DeliveryNoteController extends Controller
     }
 
     /**
-     * หน้าสแกน Barcode
+     * Redirect ไปหน้าสแกน Barcode สาธารณะ (ใช้หน้าเดียวกัน)
      */
     public function scan(DeliveryNote $deliveryNote)
     {
@@ -255,118 +331,10 @@ class DeliveryNoteController extends Controller
                 ->with('error', 'ไม่สามารถสแกนใบตัดสต็อกที่มีสถานะนี้ได้');
         }
 
-        $deliveryNote->load(['items.product']);
+        // สร้าง share URL แล้ว redirect ไปหน้าสแกนสาธารณะ
+        $url = $deliveryNote->getShareUrl();
 
-        return view('admin.delivery-notes.scan', compact('deliveryNote'));
-    }
-
-    /**
-     * บันทึก Barcode ที่สแกน
-     */
-    public function storeScan(Request $request, DeliveryNote $deliveryNote)
-    {
-        $validator = Validator::make($request->all(), [
-            'barcode' => 'required|string',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'message' => 'กรุณาระบุ barcode']);
-        }
-
-        $barcode = $request->barcode;
-
-        // ค้นหา Stock Item จาก barcode
-        $stockItem = StockItem::where('barcode', $barcode)
-            ->where('status', 'available')
-            ->first();
-
-        if (!$stockItem) {
-            return response()->json([
-                'success' => false,
-                'message' => 'ไม่พบสินค้าที่มี barcode นี้ หรือสินค้าไม่อยู่ในสถานะพร้อมใช้งาน'
-            ]);
-        }
-
-        // ตรวจสอบว่าสินค้ามีอยู่ในรายการหรือไม่
-        $deliveryNoteItem = $deliveryNote->items()
-            ->where('product_id', $stockItem->product_id)
-            ->first();
-
-        if (!$deliveryNoteItem) {
-            return response()->json([
-                'success' => false,
-                'message' => 'สินค้านี้ไม่อยู่ในรายการใบตัดสต็อก'
-            ]);
-        }
-
-        // ตรวจสอบว่าสแกนซ้ำหรือไม่
-        if ($deliveryNoteItem->hasScannedBarcode($barcode)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'barcode นี้ถูกสแกนไปแล้ว'
-            ]);
-        }
-
-        // ตรวจสอบว่าสแกนเกินหรือไม่ (แจ้งเตือนแต่ยังสแกนได้)
-        $isOverScanned = false;
-        $warningMessage = '';
-        if ($deliveryNoteItem->scanned_quantity >= $deliveryNoteItem->quantity) {
-            $isOverScanned = true;
-            $warningMessage = 'เตือน: สินค้ารายการนี้สแกนเกินจำนวนที่กำหนดแล้ว!';
-        }
-
-        // บันทึก barcode
-        $deliveryNoteItem->addScannedItem($barcode, $stockItem->serial_number);
-
-        // อัปเดตสถานะใบตัดสต็อกเป็น scanned ถ้ายังไม่เป็น
-        if (in_array($deliveryNote->status, ['pending', 'confirmed'])) {
-            $deliveryNote->update([
-                'status' => 'scanned',
-                'scanned_by' => Auth::id(),
-                'scanned_at' => now()
-            ]);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => $isOverScanned ? $warningMessage : 'สแกนสินค้าเรียบร้อยแล้ว',
-            'is_over_scanned' => $isOverScanned,
-            'data' => [
-                'product_name' => $stockItem->product->name,
-                'serial_number' => $stockItem->serial_number,
-                'scanned_quantity' => $deliveryNoteItem->fresh()->scanned_quantity,
-                'total_quantity' => $deliveryNoteItem->quantity,
-                'completion_percentage' => $deliveryNoteItem->fresh()->completion_percentage
-            ]
-        ]);
-    }
-
-    /**
-     * ลบ Barcode ที่สแกนไว้
-     */
-    public function removeScan(Request $request, DeliveryNote $deliveryNote)
-    {
-        $validator = Validator::make($request->all(), [
-            'item_id' => 'required|exists:delivery_note_items,id',
-            'barcode' => 'required|string',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json(['success' => false, 'message' => 'ข้อมูลไม่ถูกต้อง']);
-        }
-
-        $deliveryNoteItem = DeliveryNoteItem::find($request->item_id);
-
-        if ($deliveryNoteItem->delivery_note_id !== $deliveryNote->id) {
-            return response()->json(['success' => false, 'message' => 'ข้อมูลไม่ตรงกัน']);
-        }
-
-        $deliveryNoteItem->removeScannedItem($request->barcode);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'ลบรายการสแกนเรียบร้อยแล้ว'
-        ]);
+        return redirect()->away($url);
     }
 
     /**
@@ -374,18 +342,7 @@ class DeliveryNoteController extends Controller
      */
     public function review(DeliveryNote $deliveryNote)
     {
-        // ตรวจสอบสิทธิ์ admin เท่านั้น
-        if (!auth()->user()->can('manage-users')) {
-            return redirect()->route('admin.delivery-notes.show', $deliveryNote->id)
-                ->with('error', 'เฉพาะ Admin เท่านั้นที่สามารถตรวจสอบและอนุมัติได้');
-        }
-
-        if ($deliveryNote->status !== 'scanned') {
-            return redirect()->route('admin.delivery-notes.show', $deliveryNote->id)
-                ->with('error', 'ต้องสแกนสินค้าก่อนจึงจะตรวจสอบได้');
-        }
-
-        $deliveryNote->load(['items.product', 'warehouse']);
+        $deliveryNote->load(['items.product', 'creator', 'confirmer', 'scanner', 'approver']);
         $discrepancies = $deliveryNote->checkDiscrepancies();
 
         return view('admin.delivery-notes.review', compact('deliveryNote', 'discrepancies'));
@@ -445,6 +402,66 @@ class DeliveryNoteController extends Controller
                 return redirect()->back()->with('error', $result['message']);
             }
         }
+    }
+
+    /**
+     * รีเซ็ตข้อมูลการสแกน เพื่อสแกนใหม่ทั้งหมด
+     */
+    public function resetScan(DeliveryNote $deliveryNote)
+    {
+        if (!auth()->user()->can('manage-users')) {
+            return redirect()->route('admin.delivery-notes.show', $deliveryNote->id)
+                ->with('error', 'เฉพาะ Admin เท่านั้นที่สามารถรีเซ็ตการสแกนได้');
+        }
+
+        if (!in_array($deliveryNote->status, ['scanned'])) {
+            return redirect()->route('admin.delivery-notes.show', $deliveryNote->id)
+                ->with('error', 'ไม่สามารถรีเซ็ตได้ เนื่องจากสถานะปัจจุบันไม่ใช่ "สแกนแล้ว"');
+        }
+
+        DB::transaction(function () use ($deliveryNote) {
+            // ล้างข้อมูลสแกนของแต่ละรายการ
+            foreach ($deliveryNote->items as $item) {
+                $item->update([
+                    'scanned_items' => [],
+                    'scanned_quantity' => 0,
+                    'status' => 'pending',
+                ]);
+            }
+
+            // รีเซ็ตสถานะใบตัดสต็อก
+            $deliveryNote->update([
+                'status' => 'confirmed',
+                'scanned_by' => null,
+                'scanned_at' => null,
+            ]);
+        });
+
+        // Redirect ไปหน้า public scan
+        $url = $deliveryNote->getShareUrl();
+
+        return redirect()->away($url);
+    }
+
+    /**
+     * สร้าง Share Link (Copy URL) สำหรับสแกน Barcode ภายนอก
+     */
+    public function generateShareLink(DeliveryNote $deliveryNote)
+    {
+        if ($deliveryNote->status === 'completed') {
+            return response()->json([
+                'success' => false,
+                'message' => 'ใบตัดสต็อกนี้เสร็จสิ้นแล้ว ไม่สามารถสร้างลิงก์ได้',
+            ]);
+        }
+
+        $url = $deliveryNote->getShareUrl();
+
+        return response()->json([
+            'success' => true,
+            'url' => $url,
+            'expires_at' => $deliveryNote->fresh()->share_token_expires_at->format('d/m/Y H:i'),
+        ]);
     }
 
     /**

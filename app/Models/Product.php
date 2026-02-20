@@ -5,10 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Casts\Attribute;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Product extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'name',
         'sku',
@@ -102,6 +104,43 @@ class Product extends Model
     public function availableStockItems(): HasMany
     {
         return $this->hasMany(StockItem::class)->available();
+    }
+
+    /**
+     * จำนวนสต็อกที่ถูกจองโดยใบตัดสต็อกที่ยังไม่เสร็จ (pending/confirmed/scanned)
+     * ไม่นับใบที่ระบุ excludeDeliveryNoteId (สำหรับกรณีแก้ไขใบเดิม)
+     */
+    public static function getReservedStock(int $productId, ?int $excludeDeliveryNoteId = null): int
+    {
+        $query = DeliveryNoteItem::where('product_id', $productId)
+            ->whereHas('deliveryNote', function ($q) {
+                $q->whereIn('status', ['pending', 'confirmed', 'scanned']);
+            });
+
+        if ($excludeDeliveryNoteId) {
+            $query->whereHas('deliveryNote', function ($q) use ($excludeDeliveryNoteId) {
+                $q->where('id', '!=', $excludeDeliveryNoteId);
+            });
+        }
+
+        return (int) $query->sum('quantity');
+    }
+
+    /**
+     * จำนวนสต็อกที่จองอยู่ (accessor)
+     */
+    public function getReservedStockCountAttribute(): int
+    {
+        return self::getReservedStock($this->id);
+    }
+
+    /**
+     * จำนวนสต็อกที่พร้อมขายจริง (available - reserved)
+     */
+    public function getRealAvailableStockAttribute(): int
+    {
+        $available = $this->available_stock ?? $this->stockItems()->where('status', 'available')->count();
+        return max(0, $available - $this->reserved_stock_count);
     }
 
     /**
@@ -271,6 +310,23 @@ class Product extends Model
             default:
                 return 'secondary';
         }
+    }
+
+    /**
+     * ชื่อเต็มสินค้า: ชื่อ + ยาว X หน่วยวัด
+     * เช่น "เสารั้วหน้า (4x4) ยาว 4 เมตร"
+     */
+    public function getFullNameAttribute(): string
+    {
+        $name = $this->name;
+
+        if ($this->length && $this->length > 0) {
+            $lengthDisplay = rtrim(rtrim(number_format($this->length, 2), '0'), '.');
+            $unit = $this->measurement_unit_text;
+            $name .= " ยาว {$lengthDisplay} {$unit}";
+        }
+
+        return $name;
     }
 
     /**

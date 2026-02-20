@@ -22,16 +22,28 @@
             <div class="card">
                 <div class="card-header">
                     <h3 class="card-title">
-                        <i class="fas fa-search"></i> เลือกสินค้าที่ต้องการพิมพ์ Label
+                        <i class="fas fa-print"></i> เลือกสินค้าที่ต้องการพิมพ์ Label
                     </h3>
+                    <div class="card-tools">
+                        <a href="{{ route('admin.barcode-labels.verify') }}" class="btn btn-success btn-sm mr-1">
+                            <i class="fas fa-barcode"></i> สแกนยืนยัน
+                        </a>
+                        <a href="{{ route('admin.barcode-labels.history') }}" class="btn btn-info btn-sm mr-1">
+                            <i class="fas fa-history"></i> ประวัติ
+                        </a>
+                        <a href="{{ route('admin.barcode-labels.docs') }}" class="btn btn-secondary btn-sm">
+                            <i class="fas fa-book"></i> คู่มือ
+                        </a>
+                    </div>
                 </div>
                 <div class="card-body">
-                    <div class="row mb-3">
-                        <div class="col-md-6">
+                    {{-- สรุปสั้นๆ + ค้นหา --}}
+                    <div class="row mb-3 align-items-center">
+                        <div class="col-md-5">
                             <div class="input-group">
-                                <input type="text" 
-                                       class="form-control" 
-                                       id="productSearch" 
+                                <input type="text"
+                                       class="form-control"
+                                       id="productSearch"
                                        placeholder="ค้นหาสินค้า (ชื่อ, รหัส, barcode)">
                                 <div class="input-group-append">
                                     <span class="input-group-text">
@@ -40,11 +52,13 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="col-md-6">
-                            <div class="text-muted">
-                                <i class="fas fa-info-circle"></i>
-                                แสดงสินค้าที่มี StockItem พร้อมพิมพ์ Label
-                            </div>
+                        <div class="col-md-7 text-right text-sm text-muted">
+                            <span class="mr-3"><i class="fas fa-boxes text-primary"></i> สินค้า <strong>{{ $products->count() }}</strong></span>
+                            <span class="mr-3"><i class="fas fa-barcode text-success"></i> StockItems <strong>{{ $products->sum(fn($p) => $p->stockItems->count()) }}</strong></span>
+                            <span class="mr-3"><i class="fas fa-print text-warning"></i> พิมพ์แล้ว <strong>{{ $products->sum(fn($p) => $p->stockItems->whereNotNull('label_printed_at')->count()) }}</strong></span>
+                            @if($todayStats['unverified'] > 0)
+                                <span class="text-danger"><i class="fas fa-exclamation-triangle"></i> รอยืนยัน <strong>{{ $todayStats['unverified'] }}</strong></span>
+                            @endif
                         </div>
                     </div>
 
@@ -56,7 +70,7 @@
                                  data-barcode="{{ strtolower($product->barcode) }}">
                                 <div class="card h-100 card-outline card-primary">
                                     <div class="card-header text-center">
-                                        <h5 class="card-title mb-0">{{ $product->name }}</h5>
+                                        <h5 class="card-title mb-0">{{ $product->full_name }}</h5>
                                     </div>
                                     <div class="card-body">
                                         <div class="text-center mb-3">
@@ -130,74 +144,7 @@
         </div>
     </div>
 
-    <!-- Statistics Card -->
-    <div class="row">
-        <div class="col-md-12">
-            <div class="card card-info">
-                <div class="card-header">
-                    <h3 class="card-title">
-                        <i class="fas fa-chart-bar"></i> สถิติการพิมพ์ Label
-                    </h3>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        <div class="col-md-3">
-                            <div class="info-box bg-primary">
-                                <span class="info-box-icon">
-                                    <i class="fas fa-boxes"></i>
-                                </span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">สินค้าทั้งหมด</span>
-                                    <span class="info-box-number">{{ $products->count() }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="info-box bg-success">
-                                <span class="info-box-icon">
-                                    <i class="fas fa-barcode"></i>
-                                </span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">รายการทั้งหมด</span>
-                                    <span class="info-box-number">{{ $products->sum(function($p) { return $p->stockItems->count(); }) }}</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="info-box bg-warning">
-                                <span class="info-box-icon">
-                                    <i class="fas fa-check-circle"></i>
-                                </span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">พร้อมใช้งาน</span>
-                                    <span class="info-box-number">
-                                        {{ $products->sum(function($p) { 
-                                            return $p->stockItems->where('status', 'available')->count(); 
-                                        }) }}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-3">
-                            <div class="info-box bg-info">
-                                <span class="info-box-icon">
-                                    <i class="fas fa-hourglass-half"></i>
-                                </span>
-                                <div class="info-box-content">
-                                    <span class="info-box-text">จองแล้ว</span>
-                                    <span class="info-box-number">
-                                        {{ $products->sum(function($p) { 
-                                            return $p->stockItems->where('status', 'reserved')->count(); 
-                                        }) }}
-                                    </span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
+   
 @stop
 
 @section('js')

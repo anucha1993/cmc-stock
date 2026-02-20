@@ -70,9 +70,11 @@
         <div class="card-header">
             <h3 class="card-title">ค้นหาและกรองข้อมูล</h3>
             <div class="card-tools">
+                @can('create-edit')
                 <a href="{{ route('admin.packages.create') }}" class="btn btn-primary btn-sm">
                     <i class="fas fa-plus"></i> เพิ่มแพใหม่
                 </a>
+                @endcan
             </div>
         </div>
         <div class="card-body">
@@ -229,18 +231,22 @@
                                         <i class="fas fa-download"></i>
                                     </a>
                                     
+                                    @can('create-edit')
                                     <a href="{{ route('admin.packages.edit', $package) }}" 
                                        class="btn btn-sm btn-warning" 
                                        title="แก้ไข">
                                         <i class="fas fa-edit"></i>
                                     </a>
+                                    @endcan
                                     
+                                    @can('delete')
                                     <button type="button" 
                                             class="btn btn-sm btn-danger" 
                                             onclick="confirmDelete('{{ $package->id }}', '{{ $package->name }}')"
                                             title="ลบ">
                                         <i class="fas fa-trash"></i>
                                     </button>
+                                    @endcan
                                     
                                     <button type="button" 
                                             class="btn btn-sm btn-secondary" 

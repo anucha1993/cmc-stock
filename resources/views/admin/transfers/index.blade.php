@@ -96,9 +96,11 @@
         <div class="card-header">
             <h3 class="card-title">รายการการโอนสินค้า</h3>
             <div class="card-tools">
+                @can('create-edit')
                 <a href="{{ route('admin.transfers.create') }}" class="btn btn-primary btn-sm">
                     <i class="fas fa-plus"></i> สร้างใบโอน
                 </a>
+                @endcan
                 <a href="{{ route('admin.transfers.report') }}" class="btn btn-info btn-sm">
                     <i class="fas fa-chart-bar"></i> รายงาน
                 </a>
@@ -127,7 +129,7 @@
                                     <strong>{{ $transfer->transfer_code }}</strong>
                                 </td>
                                 <td>
-                                    <strong>{{ $transfer->product->name }}</strong><br>
+                                    <strong>{{ $transfer->product->full_name }}</strong><br>
                                     <small class="text-muted">SKU: {{ $transfer->product->sku }}</small>
                                 </td>
                                 <td>
@@ -191,14 +193,18 @@
                                         </a>
                                         
                                         @if($transfer->status == 'pending')
+                                            @can('create-edit')
                                             <a href="{{ route('admin.transfers.edit', $transfer) }}" 
                                                class="btn btn-warning" title="แก้ไข">
                                                 <i class="fas fa-edit"></i>
                                             </a>
+                                            @endcan
+                                            @can('approve')
                                             <button type="button" class="btn btn-success" 
                                                     onclick="confirmApprove({{ $transfer->id }})" title="อนุมัติ">
                                                 <i class="fas fa-check"></i>
                                             </button>
+                                            @endcan
                                         @endif
                                         
                                         @if($transfer->status == 'in_transit')
