@@ -285,6 +285,42 @@ class StockCheckController extends Controller
     }
 
     /**
+     * Delete a scanned item from the session
+     */
+    public function deleteScanItem(StockCheckSession $stockCheck, StockCheckItem $checkItem)
+    {
+        // Verify the item belongs to this session
+        if ($checkItem->session_id !== $stockCheck->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'รายการนี้ไม่ได้อยู่ในเซสชันนี้'
+            ], 403);
+        }
+
+        if (!$stockCheck->isActive()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'เซสชันนี้ไม่สามารถแก้ไขได้แล้ว'
+            ], 400);
+        }
+
+        try {
+            $barcode = $checkItem->barcode;
+            $checkItem->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'ลบรายการ ' . $barcode . ' เรียบร้อยแล้ว'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'เกิดข้อผิดพลาด: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Show discrepancy report
      */
     public function report(StockCheckSession $stockCheck)
@@ -460,7 +496,6 @@ class StockCheckController extends Controller
         $items = $stockCheck->checkItems()
             ->with(['product', 'stockItem'])
             ->orderBy('last_scanned_at', 'desc')
-            ->limit(10)
             ->get();
 
         return response()->json($items);

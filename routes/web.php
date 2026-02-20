@@ -124,6 +124,7 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
         // ตรวจนับสต็อก — สแกน
         Route::get('stock-checks/{stockCheck}/scan', [StockCheckController::class, 'scan'])->name('stock-checks.scan');
         Route::post('stock-checks/{stockCheck}/process-scan', [StockCheckController::class, 'processScan'])->name('stock-checks.process-scan');
+        Route::delete('stock-checks/{stockCheck}/scan-item/{checkItem}', [StockCheckController::class, 'deleteScanItem'])->name('stock-checks.delete-scan-item');
         Route::get('api/stock-checks/{stockCheck}/stats', [StockCheckController::class, 'getStats'])->name('api.stock-checks.stats');
         Route::get('api/stock-checks/{stockCheck}/recent-scans', [StockCheckController::class, 'getRecentScans'])->name('api.stock-checks.recent-scans');
 

@@ -237,6 +237,7 @@
             padding: 10px 14px;
             border-bottom: 1px solid #f0f0f0;
             background: #fff;
+            position: relative;
         }
 
         .scanned-item:active {
@@ -268,6 +269,23 @@
         .item-count-label {
             font-size: 0.7rem;
             color: #adb5bd;
+        }
+
+        .btn-delete-item {
+            background: none;
+            border: none;
+            color: #dc3545;
+            font-size: 1.1rem;
+            padding: 6px 8px;
+            cursor: pointer;
+            opacity: 0.6;
+            transition: opacity 0.15s;
+            flex-shrink: 0;
+        }
+
+        .btn-delete-item:hover,
+        .btn-delete-item:active {
+            opacity: 1;
         }
 
         .scan-badge {
@@ -512,13 +530,13 @@
                 items.forEach(item => {
                     if (!groupedItems[item.barcode]) {
                         groupedItems[item.barcode] = {
+                            id: item.id,
                             barcode: item.barcode,
                             product: item.product,
-                            count: 0,
+                            count: item.scanned_count || 1,
                             status: item.status
                         };
                     }
-                    groupedItems[item.barcode].count += 1;
                 });
                 
                 // Render grouped items
@@ -527,15 +545,20 @@
                     const statusClass = getStatusClass(item.status);
                     const statusText = getStatusText(item.status);
                     
-                    html += `<div class="scanned-item">
+                    html += `<div class="scanned-item" id="scan-item-${item.id}">
                         <div class="flex-grow-1" style="min-width:0">
                             <div class="item-barcode">${item.barcode}</div>
                             <div class="item-product text-truncate">${productName}</div>
                             <span class="badge badge-${statusClass} scan-badge">${statusText}</span>
                         </div>
-                        <div class="text-right ml-2" style="flex-shrink:0">
-                            <div class="item-count">${item.count}</div>
-                            <div class="item-count-label">ชิ้น</div>
+                        <div class="d-flex align-items-center ml-2" style="flex-shrink:0; gap:8px">
+                            <div class="text-right">
+                                <div class="item-count">${item.count}</div>
+                                <div class="item-count-label">ชิ้น</div>
+                            </div>
+                            <button type="button" class="btn-delete-item" onclick="deleteItem(${item.id}, '${item.barcode}')" title="ลบรายการ">
+                                <i class="fas fa-trash-alt"></i>
+                            </button>
                         </div>
                     </div>`;
                 });
@@ -594,6 +617,41 @@
                 case 'info': return 'fas fa-info-circle';
                 default: return 'fas fa-info-circle';
             }
+        }
+
+        function deleteItem(itemId, barcode) {
+            if (!confirm('ต้องการลบรายการ ' + barcode + ' ใช่หรือไม่?')) {
+                return;
+            }
+
+            $.ajax({
+                url: `/admin/stock-checks/${sessionId}/scan-item/${itemId}`,
+                method: 'DELETE',
+                data: {
+                    _token: '{{ csrf_token() }}'
+                },
+                success: function(response) {
+                    if (response.success) {
+                        showAlert(response.message, 'success');
+                        loadScannedItems();
+                        
+                        if (navigator.vibrate) {
+                            navigator.vibrate(50);
+                        }
+                    } else {
+                        showAlert(response.message, 'danger');
+                    }
+                },
+                error: function(xhr) {
+                    let message = 'เกิดข้อผิดพลาดในการลบ';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+                    showAlert(message, 'danger');
+                }
+            });
+
+            $('#barcode-input').focus();
         }
 
         function saveAndReturn() {
